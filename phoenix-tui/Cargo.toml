@@ -1,0 +1,18 @@
+[package]
+name = "phoenix-tui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ratatui = "0.25"
+crossterm = "0.27"
+tokio = { version = "1.0", features = ["full"] }
+cerebrum_nexus = { path = "../cerebrum_nexus" }
+neural_cortex_strata = { path = "../neural_cortex_strata" }
+vital_organ_vaults = { path = "../vital_organ_vaults" }
+evolutionary_helix_core = { path = "../evolutionary_helix_core" }
+synaptic_tuning_fibers = { path = "../synaptic_tuning_fibers" }
+nervous_pathway_network = { path = "../nervous_pathway_network" }
+vascular_integrity_system = { path = "../vascular_integrity_system" }
+vital_pulse_monitor = { path = "../vital_pulse_monitor" }
+limb_extension_grafts = { path = "../limb_extension_grafts" }
