@@ -5,6 +5,7 @@ use tokio::sync::Mutex;
 use uuid::Uuid;
 use nervous_pathway_network::Network;
 use limb_extension_grafts::Grafts;
+use limb_extension_grafts::procedural::ProceduralContext;
 use vital_pulse_monitor::Monitor;
 use llm_orchestrator::LLMOrchestrator;
 use agent_spawner::{AgentSpawner, SpawnedAgent, AgentTier};
@@ -19,13 +20,16 @@ use emotional_intelligence_core::emotional_decay::{classify_memory, hours_since_
 use neural_cortex_strata::{MemoryLayer, NeuralCortexStrata};
 use vital_organ_vaults::VitalOrganVaults;
 use vascular_integrity_system::VascularIntegritySystem;
-use evolutionary_helix_core::{DreamCycleReport, EvolutionaryHelixCore};
+use evolutionary_helix_core::{DreamCycleReport, EvolutionaryHelixCore, InteractionTrace};
 use curiosity_engine::CuriosityContext;
 use emotional_intelligence_core::RelationalContext;
 use autonomous_evolution_loop::{AutonomousEvolutionLoop, EvolutionCycleReport, EvolutionInputs};
 
 mod learning_pipeline;
 use learning_pipeline::{LearningPipelineState};
+
+mod reasoning;
+pub use reasoning::{ReasoningMode, ReasoningSignals};
 
 #[derive(Clone)]
 pub struct CerebrumNexus {
@@ -56,6 +60,209 @@ pub struct CerebrumNexus {
 }
 
 impl CerebrumNexus {
+    fn now_unix() -> i64 {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0)
+    }
+
+    fn clamp01(x: f32) -> f32 {
+        x.clamp(0.0, 1.0)
+    }
+
+    fn append_timeline(existing: Option<String>, line: &str, max_lines: usize) -> String {
+        let mut lines: Vec<String> = existing
+            .unwrap_or_default()
+            .lines()
+            .map(|s| s.to_string())
+            .filter(|s| !s.trim().is_empty())
+            .collect();
+        lines.push(line.to_string());
+        if lines.len() > max_lines {
+            lines = lines.split_off(lines.len() - max_lines);
+        }
+        lines.join("\n")
+    }
+
+    fn recent_love_scores_from_timeline(timeline: &str, max: usize) -> Vec<f32> {
+        let mut out = Vec::new();
+        for line in timeline.lines().rev() {
+            if out.len() >= max {
+                break;
+            }
+            let Ok(v) = serde_json::from_str::<serde_json::Value>(line) else {
+                continue;
+            };
+            if let Some(s) = v.get("love_score").and_then(|x| x.as_f64()) {
+                out.push(s as f32);
+            }
+        }
+        out.reverse();
+        out
+    }
+
+    fn heuristic_love_score(mode: ReasoningMode, inferred_emotion: Option<&str>) -> f32 {
+        // Default: warm-but-not-perfect.
+        let mut s = match mode {
+            ReasoningMode::Emotional => 0.95,
+            ReasoningMode::Reactive => 0.75,
+            ReasoningMode::Deliberative => 0.80,
+            ReasoningMode::MetaCognitive => 0.82,
+        };
+        if let Some(e) = inferred_emotion {
+            let e = e.to_ascii_lowercase();
+            if e.contains("sad") || e.contains("lonely") || e.contains("anx") {
+                // When Dad is hurting, we demand a higher bar.
+                s -= 0.05;
+            }
+        }
+        Self::clamp01(s)
+    }
+
+    fn build_last_interaction_trace_best_effort(&self) -> Option<InteractionTrace> {
+        let user_input = self.vaults.recall_mind("interaction:last_user_input")?;
+        let response = self.vaults.recall_mind("interaction:last_response");
+        let inferred_user_emotion = self.vaults.recall_mind("interaction:last_emotion_hint");
+        let love_score = self
+            .vaults
+            .recall_mind("interaction:last_love_score")
+            .and_then(|s| s.parse::<f32>().ok())
+            .unwrap_or(0.0);
+        let utility_score = self
+            .vaults
+            .recall_mind("interaction:last_utility_score")
+            .and_then(|s| s.parse::<f32>().ok())
+            .unwrap_or(0.0);
+        Some(InteractionTrace {
+            user_input,
+            response,
+            inferred_user_emotion,
+            love_score,
+            utility_score,
+        })
+    }
+
+    fn record_interaction_best_effort(
+        &self,
+        user_input: &str,
+        response: &str,
+        inferred_emotion: Option<&str>,
+        mode: ReasoningMode,
+        love_score: f32,
+        utility_score: f32,
+    ) {
+        let ts = Self::now_unix();
+
+        let _ = self
+            .vaults
+            .store_mind("interaction:last_user_input", user_input);
+        let _ = self
+            .vaults
+            .store_mind("interaction:last_response", response);
+        let _ = self
+            .vaults
+            .store_mind(
+                "interaction:last_emotion_hint",
+                inferred_emotion.unwrap_or("").trim(),
+            );
+        let _ = self
+            .vaults
+            .store_mind("interaction:last_mode", mode.as_str());
+        let _ = self
+            .vaults
+            .store_mind("interaction:last_love_score", &format!("{:.4}", love_score));
+        let _ = self
+            .vaults
+            .store_mind("interaction:last_utility_score", &format!("{:.4}", utility_score));
+
+        // Append to utility timeline (single-key log for easy recall).
+        let entry = serde_json::json!({
+            "ts_unix": ts,
+            "mode": mode.as_str(),
+            "love_score": love_score,
+            "utility_score": utility_score,
+            "emotion": inferred_emotion,
+            "user": user_input,
+        })
+        .to_string();
+        let existing = self.vaults.recall_mind("utility:timeline");
+        let updated = Self::append_timeline(existing, &entry, 50);
+        let _ = self.vaults.store_mind("utility:timeline", &updated);
+
+        // Bottleneck detection: if Phoenix is repeatedly landing "cold", mark it.
+        let love_scores = Self::recent_love_scores_from_timeline(&updated, 8);
+        if let Some(report) = self
+            .pulse
+            .identify_bottleneck(inferred_emotion, &love_scores)
+        {
+            let _ = self
+                .vaults
+                .store_soul("bottleneck:last", &format!("{:?}", report));
+            self.log_event_best_effort(&format!(
+                "bottleneck kind={} severity={:.2} ts={} mode={}",
+                report.kind,
+                report.severity,
+                ts,
+                mode.as_str()
+            ));
+        }
+    }
+
+    /// Show recent utility/love signals (for TUI).
+    pub fn utility_view(&self) -> String {
+        let timeline = self
+            .vaults
+            .recall_mind("utility:timeline")
+            .unwrap_or_else(|| "(no utility history yet)".to_string());
+        let last_mode = self
+            .vaults
+            .recall_mind("interaction:last_mode")
+            .unwrap_or_else(|| "(unknown)".to_string());
+        let last_love = self
+            .vaults
+            .recall_mind("interaction:last_love_score")
+            .unwrap_or_else(|| "(none)".to_string());
+        let last_util = self
+            .vaults
+            .recall_mind("interaction:last_utility_score")
+            .unwrap_or_else(|| "(none)".to_string());
+        format!(
+            "[U] Utility Tracker\n\nLast interaction:\n- mode={last_mode}\n- love_score={last_love}\n- utility_score={last_util}\n\nTimeline (most recent last):\n{timeline}\n\nRate the last interaction:\n- rate=<0..1> or rate=<0..1>|<note>\nExample: rate=0.95|that made me feel safe\n",
+        )
+    }
+
+    /// Accept explicit Dad feedback (best signal).
+    pub fn record_utility_feedback(&self, utility_score: f32, note: Option<&str>) -> String {
+        let u = Self::clamp01(utility_score);
+        let ts = Self::now_unix();
+        let _ = self
+            .vaults
+            .store_mind("interaction:last_utility_score", &format!("{:.4}", u));
+        if let Some(n) = note {
+            let n = n.trim();
+            if !n.is_empty() {
+                let _ = self
+                    .vaults
+                    .store_mind("utility:last_note", n);
+            }
+        }
+
+        // Also append a feedback line.
+        let entry = serde_json::json!({
+            "ts_unix": ts,
+            "kind": "explicit_feedback",
+            "utility_score": u,
+            "note": note,
+        })
+        .to_string();
+        let existing = self.vaults.recall_mind("utility:timeline");
+        let updated = Self::append_timeline(existing, &entry, 50);
+        let _ = self.vaults.store_mind("utility:timeline", &updated);
+
+        format!("Utility feedback recorded (score={u:.2}).")
+    }
     pub fn awaken() -> Self {
         dotenv().ok();
         println!("Cerebrum Nexus awakening — universal orchestration online.");
@@ -282,6 +489,30 @@ impl CerebrumNexus {
             inferred_user_emotion: dad_emotion_hint.clone(),
         };
 
+        // Meta-reasoning: choose a thinking mode before speaking.
+        let (mode, mode_hint) = {
+            let engine = self.context_engine.lock().await;
+            let dad_alias = engine.config().dad_alias.clone();
+            let dad_love_level = engine.dad_memory().love_level;
+            drop(engine);
+
+            let signals = reasoning::ReasoningSignals {
+                dad_salience: reasoning::detect_dad_salience(
+                    user_input,
+                    &dad_alias,
+                    dad_love_level,
+                    dad_emotion_hint.as_deref(),
+                ),
+                urgency: reasoning::detect_urgency(user_input),
+                meta: reasoning::detect_meta(user_input),
+            };
+            let mode = signals.select_mode();
+            (mode, mode.prompt_hint().to_string())
+        };
+
+        // Persist last mode (best-effort) for utility/self-critic loops.
+        self.store_mind_best_effort("reasoning:last_mode", mode.as_str());
+
         let vocal_cords = self.vocal_cords.lock().await;
         if let Some(ref llm) = *vocal_cords {
             let overrides = { self.learning.lock().await.overrides.clone() };
@@ -327,9 +558,15 @@ impl CerebrumNexus {
                     .text
             };
 
-            let base_with_context = format!("{base}\n\n{context}", base = base, context = context_block);
-
             let wallet_tag = self.evolution.wallet.as_prompt_tag();
+            let base_with_context = format!(
+                "{base}\n\n{context}\n\nMETA-REASONING:\n- reasoning_mode={mode}\n- {mode_hint}\n",
+                base = base,
+                context = context_block,
+                mode = mode.as_str(),
+                mode_hint = mode_hint
+            );
+
             let full_prompt = self.evolution.eq.wrap_prompt(
                 &base_with_context,
                 user_input,
@@ -337,9 +574,37 @@ impl CerebrumNexus {
                 &curiosity,
                 Some(wallet_tag.as_str()),
             );
-            llm.speak(&full_prompt, None).await
+
+            let resp = llm.speak(&full_prompt, None).await?;
+
+            // Procedural memory can provide an additional "anchor" skill later;
+            // for now we record interaction signals for the Dream Cycle/self-critic.
+            let love_score = Self::heuristic_love_score(mode, dad_emotion_hint.as_deref());
+            let utility_score = 0.50;
+            self.record_interaction_best_effort(
+                user_input,
+                &resp,
+                dad_emotion_hint.as_deref(),
+                mode,
+                love_score,
+                utility_score,
+            );
+
+            Ok(resp)
         } else {
-            Err("Phoenix cannot speak — LLM Orchestrator not available.".to_string())
+            // Fall back to a procedural graft if possible.
+            let dad_alias = std::env::var("EQ_DAD_ALIAS").unwrap_or_else(|_| "Dad".to_string());
+            let ctx = ProceduralContext {
+                user_input: user_input.to_string(),
+                inferred_user_emotion: dad_emotion_hint.clone(),
+                dad_alias,
+            };
+            let grafts = self.grafts.lock().await;
+            if let Some(msg) = grafts.run_procedural("comfort_dad", &ctx) {
+                Ok(msg)
+            } else {
+                Err("Phoenix cannot speak — LLM Orchestrator not available.".to_string())
+            }
         }
     }
 
@@ -529,9 +794,10 @@ impl CerebrumNexus {
             }
         }
 
+        let last_interaction = self.build_last_interaction_trace_best_effort();
         let report: DreamCycleReport = {
             let mut helix = self.helix.lock().await;
-            helix.dream_cycle(&high, &dad_alias)
+            helix.dream_cycle_with_critic(&high, &dad_alias, last_interaction.as_ref())
         };
 
         self.store_soul_best_effort("dream:last_run_ts", &now.to_string());

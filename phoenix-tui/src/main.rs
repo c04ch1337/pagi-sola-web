@@ -35,6 +35,7 @@ enum MenuItem {
     Learning,
     Speak,
     Spawn,
+    Utility,
 }
 
 impl Default for MenuItem {
@@ -56,6 +57,7 @@ struct App {
     asi_panel: String,
     context_panel: String,
     decay_panel: String,
+    utility_panel: String,
 }
 
 impl App {
@@ -73,6 +75,7 @@ impl App {
             asi_panel: "ASI Mode idle. Press Enter to view wallet identity stubs.".to_string(),
             context_panel: "Context Engineering idle. Press Enter to render current context, or type a prompt then Enter.".to_string(),
             decay_panel: "Dynamic Emotional Decay idle. Press Enter to render decay curves; type 'dream' then Enter to run a dream cycle.".to_string(),
+            utility_panel: "Utility Tracker idle. Press Enter to view signals; type 'rate=<0..1>|<note>' then Enter.".to_string(),
         }
     }
 
@@ -134,6 +137,7 @@ async fn main() -> Result<(), io::Error> {
                         KeyCode::Char('l') => app.active_menu = MenuItem::Learning,
                         KeyCode::Char('v') => app.active_menu = MenuItem::Speak,
                         KeyCode::Char('g') => app.active_menu = MenuItem::Spawn,
+                        KeyCode::Char('u') => app.active_menu = MenuItem::Utility,
                         _ => {}
                     },
                     _ => {
@@ -151,6 +155,7 @@ async fn main() -> Result<(), io::Error> {
                                         | MenuItem::Asi
                                         | MenuItem::Context
                                         | MenuItem::Decay
+                                        | MenuItem::Utility
                                 );
 
                                 if !input.is_empty() || allow_empty_submit {
@@ -428,6 +433,33 @@ async fn handle_input(app: &mut App, input: &str) -> String {
                 }
             }
         }
+        MenuItem::Utility => {
+            let trimmed = input.trim();
+            if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("status") {
+                let msg = app.cerebrum.utility_view();
+                app.utility_panel = msg.clone();
+                msg
+            } else if let Some(rest) = trimmed.strip_prefix("rate=") {
+                let parts: Vec<&str> = rest.splitn(2, '|').collect();
+                let score = parts
+                    .get(0)
+                    .and_then(|s| s.trim().parse::<f32>().ok())
+                    .unwrap_or(0.0);
+                let note = parts.get(1).map(|s| s.trim()).filter(|s| !s.is_empty());
+                let ack = app.cerebrum.record_utility_feedback(score, note);
+                let msg = format!("{ack}\n\n{}", app.cerebrum.utility_view());
+                app.utility_panel = msg.clone();
+                msg
+            } else if trimmed.eq_ignore_ascii_case("help") {
+                let msg = "Commands:\n- (Enter): status\n- rate=<0..1>|<note>\n- help".to_string();
+                app.utility_panel = msg.clone();
+                msg
+            } else {
+                let msg = "Unknown Utility command. Type 'help'.".to_string();
+                app.utility_panel = msg.clone();
+                msg
+            }
+        }
         _ => "Command received. Flame acknowledges.".to_string(),
     }
 }
@@ -481,6 +513,7 @@ fn ui(f: &mut Frame, app: &mut App) {
 [L] Learning Pipeline (Collective Intelligence)
 [V] LLM Orchestrator (Speak — 500+ models)
 [G] Agent Spawner (GitHub — spawn agents)
+[U] Utility Tracker (Love/utility signals)
 [Q] Quit
 
 Cerebrum Nexus: Orchestrating...
@@ -488,6 +521,15 @@ Cerebrum Nexus: Orchestrating...
             )
             .block(Block::default().title("Main Menu").borders(Borders::ALL));
             f.render_widget(menu, body_chunks[0]);
+        }
+        MenuItem::Utility => {
+            let panel = Paragraph::new(format!(
+                "Utility Tracker\n\nEnter: show status\nType: rate=<0..1>|<note>\n\nInput: {}\n\n{}",
+                app.input, app.utility_panel
+            ))
+            .block(Block::default().title("Utility Tracker").borders(Borders::ALL))
+            .wrap(Wrap { trim: true });
+            f.render_widget(panel, body_chunks[0]);
         }
         MenuItem::Memory => {
             let memory_panel = Paragraph::new(format!(

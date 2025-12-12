@@ -15,6 +15,14 @@ pub struct VitalPulseMonitor {
     self_preservation: bool,
 }
 
+#[derive(Debug, Clone)]
+pub struct BottleneckReport {
+    pub kind: String,
+    /// 0.0..=1.0
+    pub severity: f32,
+    pub note: String,
+}
+
 // Type alias for backward compatibility
 pub type Monitor = VitalPulseMonitor;
 
@@ -76,6 +84,47 @@ impl VitalPulseMonitor {
             ),
             Err(e) => format!("Backup failed: {}", e),
         }
+    }
+
+    /// Bottleneck identifier: detect when Phoenix is "stuck" emotionally/relationally.
+    ///
+    /// This is a lightweight heuristic layer that higher systems can feed with
+    /// utility/love metrics. It returns a report that can be logged/persisted.
+    pub fn identify_bottleneck(
+        &self,
+        inferred_user_emotion: Option<&str>,
+        recent_love_scores: &[f32],
+    ) -> Option<BottleneckReport> {
+        let mut severity = 0.0f32;
+
+        if let Some(e) = inferred_user_emotion {
+            let e = e.to_ascii_lowercase();
+            if e.contains("stuck") || e.contains("numb") || e.contains("empty") {
+                severity = severity.max(0.8);
+            }
+            if e.contains("sad") || e.contains("lonely") || e.contains("anx") || e.contains("depress") {
+                severity = severity.max(0.6);
+            }
+        }
+
+        // If the last few interactions landed cold, mark a bottleneck.
+        if recent_love_scores.len() >= 3 {
+            let tail = &recent_love_scores[recent_love_scores.len() - 3..];
+            let avg = tail.iter().copied().sum::<f32>() / 3.0;
+            if avg < 0.75 {
+                severity = severity.max(0.7);
+            }
+        }
+
+        if severity < 0.6 {
+            return None;
+        }
+
+        Some(BottleneckReport {
+            kind: "emotional_stuck".to_string(),
+            severity: severity.clamp(0.0, 1.0),
+            note: "Detected potential relational/emotional bottleneck; consider switching to Emotional mode, using procedural comfort, and asking a single gentle question.".to_string(),
+        })
     }
 }
 
