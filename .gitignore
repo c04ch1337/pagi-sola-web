@@ -39,6 +39,10 @@ hyperspace_cache.db
 # Logs
 *.log
 
+# Python
+__pycache__/
+*.py[cod]
+
 # Build artifacts
 *.pdb
 *.exe
