@@ -143,6 +143,19 @@ impl GitHubEnforcer {
         let auto_merge_on_approval = env_bool("AUTO_MERGE_ON_APPROVAL").unwrap_or(false);
         let timeout_hours = env_u64("PR_APPROVAL_TIMEOUT_HOURS").unwrap_or(24);
 
+        // Diagnostic telemetry (safe to print): helps explain why creations are blocked.
+        // Avoid printing secrets; only print whether token/owner are present.
+        println!(
+            "[GitHubEnforcer::from_env] require_human_approval={} auto_merge_on_approval={} timeout_hours={} token_present={} owner_present={} agents_repo={} tools_repo={}",
+            require_human_approval,
+            auto_merge_on_approval,
+            timeout_hours,
+            !token.trim().is_empty(),
+            !owner.trim().is_empty(),
+            agents_repo,
+            tools_repo
+        );
+
         Self {
             token,
             owner,
@@ -163,6 +176,11 @@ impl GitHubEnforcer {
     ) -> Result<String, CreationError> {
         if !self.require_human_approval {
             // Safety mandate: Phoenix refuses to proceed without explicit blessing.
+            println!(
+                "[GitHubEnforcer::create_and_enforce_creation] blocked: REQUIRE_HUMAN_PR_APPROVAL=false (kind={}, name={})",
+                kind,
+                name
+            );
             return Err(CreationError::HumanApprovalDisabled);
         }
         if self.token.trim().is_empty() {

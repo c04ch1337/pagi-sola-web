@@ -1,10 +1,15 @@
 // cerebrum_nexus/src/tool_agent.rs
 // Simulated tools: narrative materialization (image/audio generation + branching story events).
 
+// Some workspace builds have shown `sysinfo` not being picked up via the extern prelude.
+// Declare it explicitly so `sysinfo::System` resolves reliably.
+extern crate sysinfo;
+
 use anyhow::Result;
 use llm_orchestrator::LlmProvider;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use sysinfo::{Pid, System};
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
@@ -287,11 +292,20 @@ impl ToolAgent {
             });
         }
 
-        let is_unrestricted_execution_enabled =
-            std::env::var("MASTER_ORCHESTRATOR_UNRESTRICTED_EXECUTION")
-                .ok()
-                .map(|s| matches!(s.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
-                .unwrap_or(false);
+        let raw_flag = std::env::var("MASTER_ORCHESTRATOR_UNRESTRICTED_EXECUTION").ok();
+        let is_unrestricted_execution_enabled = raw_flag
+            .as_deref()
+            .map(|s| matches!(s.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+            .unwrap_or(false);
+
+        // Diagnostic logging: explains why command execution is blocked.
+        // Does not print the command itself (may contain secrets).
+        eprintln!(
+            "[ToolAgent::execute_unrestricted_command] enabled={} env_present={} cwd_present={}",
+            is_unrestricted_execution_enabled,
+            raw_flag.is_some(),
+            working_directory.is_some()
+        );
 
         if !is_unrestricted_execution_enabled {
             return Err(anyhow::anyhow!(
@@ -343,7 +357,7 @@ impl ToolAgent {
 
     match sub_command {
         "list" => {
-            let mut sys = sysinfo::System::new_all();
+            let mut sys = System::new_all();
             sys.refresh_all();
             let processes = sys
                 .processes()
@@ -359,9 +373,9 @@ impl ToolAgent {
         }
         "kill" => {
             if let Some(p) = pid {
-                let mut sys = sysinfo::System::new_all();
+                let mut sys = System::new_all();
                 sys.refresh_all();
-                if let Some(process) = sys.process(p.into()) {
+                if let Some(process) = sys.process(Pid::from(p as usize)) {
                     if process.kill() {
                         Ok(ToolOutput::Process(ProcessOutput::Kill(Ok(()))))
                     } else {

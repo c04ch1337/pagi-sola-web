@@ -908,6 +908,7 @@ dependencies = [
  "serde",
  "serde_json",
  "skill_system",
+ "sysinfo",
  "system_access",
  "tokio",
  "tokio-tungstenite",
