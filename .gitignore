@@ -5,6 +5,10 @@ target_buildcheck/
 **/*.rs.bk
 Cargo.lock  # Optional, but common to ignore in libraries
 
+# ML / model assets (downloaded at runtime)
+models/*
+!models/.gitkeep
+
 # Node / Frontend build artifacts
 **/node_modules/
 **/dist/
@@ -60,4 +64,3 @@ __pycache__/
 *.zip
 *.tar.gz
 *.pdf
-

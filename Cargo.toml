@@ -15,6 +15,7 @@ members = [
     "multi_modal_recording",
     "multi_modal_input",
     "emotion_detection",
+    "vision_advanced",
     "context_engine",
     "emotional_intelligence_core",
     "curiosity_engine",
