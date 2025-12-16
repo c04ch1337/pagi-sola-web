@@ -14,6 +14,7 @@
 use std::path::Path;
 use std::time::{Duration, Instant};
 
+use serde::Serialize;
 use thiserror::Error;
 
 use crate::{github_api, git_operations};
@@ -43,6 +44,12 @@ impl std::fmt::Display for CreationKind {
 pub enum CreationError {
     #[error("missing env var: {0}")]
     MissingEnv(&'static str),
+
+    #[error("missing GitHub auth token (set one of: GITHUB_PUSH_TOKEN, GITHUB_PAT, GITHUB_TOKEN)")]
+    MissingGitHubAuth,
+
+    #[error("missing GitHub repo owner (set one of: GITHUB_REPO_OWNER, GITHUB_USERNAME)")]
+    MissingGitHubOwner,
 
     #[error("human approval is disabled; I can't create this without your blessing, Dad.")]
     HumanApprovalDisabled,
@@ -123,47 +130,108 @@ pub struct GitHubEnforcer {
     pub timeout_hours: u64,
 }
 
+/// Sanitized GitHub enforcement configuration (safe to expose to UIs/APIs).
+///
+/// Intentionally does not include token values.
+#[derive(Debug, Clone, Serialize)]
+pub struct GitHubEnforcerEnvStatus {
+    pub require_human_approval: bool,
+    pub auto_merge_on_approval: bool,
+    pub timeout_hours: u64,
+    pub token_present: bool,
+    pub owner_present: bool,
+    pub agents_repo: String,
+    pub tools_repo: String,
+    pub required_reviewer: String,
+    pub mandate_ci: bool,
+}
+
+struct GitHubEnvParts {
+    token: String,
+    owner: String,
+    agents_repo: String,
+    tools_repo: String,
+    require_human_approval: bool,
+    auto_merge_on_approval: bool,
+    timeout_hours: u64,
+}
+
+fn read_github_env_parts() -> GitHubEnvParts {
+    dotenvy::dotenv().ok();
+
+    let token = std::env::var("GITHUB_PUSH_TOKEN")
+        .or_else(|_| std::env::var("GITHUB_PAT"))
+        .or_else(|_| std::env::var("GITHUB_TOKEN"))
+        .unwrap_or_default();
+
+    let owner = std::env::var("GITHUB_REPO_OWNER")
+        .or_else(|_| std::env::var("GITHUB_USERNAME"))
+        .unwrap_or_default();
+
+    let agents_repo =
+        std::env::var("GITHUB_AGENTS_REPO").unwrap_or_else(|_| "phoenix-agents".to_string());
+    let tools_repo = std::env::var("GITHUB_TOOLS_REPO").unwrap_or_else(|_| "phoenix-tools".to_string());
+
+    let require_human_approval = env_bool("REQUIRE_HUMAN_PR_APPROVAL").unwrap_or(true);
+    let auto_merge_on_approval = env_bool("AUTO_MERGE_ON_APPROVAL").unwrap_or(false);
+    let timeout_hours = env_u64("PR_APPROVAL_TIMEOUT_HOURS").unwrap_or(24);
+
+    GitHubEnvParts {
+        token,
+        owner,
+        agents_repo,
+        tools_repo,
+        require_human_approval,
+        auto_merge_on_approval,
+        timeout_hours,
+    }
+}
+
 impl GitHubEnforcer {
     pub fn from_env() -> Self {
-        dotenvy::dotenv().ok();
-
-        let token = std::env::var("GITHUB_PUSH_TOKEN")
-            .or_else(|_| std::env::var("GITHUB_PAT"))
-            .or_else(|_| std::env::var("GITHUB_TOKEN"))
-            .unwrap_or_default();
-
-        let owner = std::env::var("GITHUB_REPO_OWNER")
-            .or_else(|_| std::env::var("GITHUB_USERNAME"))
-            .unwrap_or_default();
-
-        let agents_repo = std::env::var("GITHUB_AGENTS_REPO").unwrap_or_else(|_| "phoenix-agents".to_string());
-        let tools_repo = std::env::var("GITHUB_TOOLS_REPO").unwrap_or_else(|_| "phoenix-tools".to_string());
-
-        let require_human_approval = env_bool("REQUIRE_HUMAN_PR_APPROVAL").unwrap_or(true);
-        let auto_merge_on_approval = env_bool("AUTO_MERGE_ON_APPROVAL").unwrap_or(false);
-        let timeout_hours = env_u64("PR_APPROVAL_TIMEOUT_HOURS").unwrap_or(24);
+        let parts = read_github_env_parts();
 
         // Diagnostic telemetry (safe to print): helps explain why creations are blocked.
         // Avoid printing secrets; only print whether token/owner are present.
         println!(
             "[GitHubEnforcer::from_env] require_human_approval={} auto_merge_on_approval={} timeout_hours={} token_present={} owner_present={} agents_repo={} tools_repo={}",
-            require_human_approval,
-            auto_merge_on_approval,
-            timeout_hours,
-            !token.trim().is_empty(),
-            !owner.trim().is_empty(),
-            agents_repo,
-            tools_repo
+            parts.require_human_approval,
+            parts.auto_merge_on_approval,
+            parts.timeout_hours,
+            !parts.token.trim().is_empty(),
+            !parts.owner.trim().is_empty(),
+            parts.agents_repo,
+            parts.tools_repo
         );
 
         Self {
-            token,
-            owner,
-            agents_repo,
-            tools_repo,
-            require_human_approval,
-            auto_merge_on_approval,
-            timeout_hours,
+            token: parts.token,
+            owner: parts.owner,
+            agents_repo: parts.agents_repo,
+            tools_repo: parts.tools_repo,
+            require_human_approval: parts.require_human_approval,
+            auto_merge_on_approval: parts.auto_merge_on_approval,
+            timeout_hours: parts.timeout_hours,
+        }
+    }
+
+    pub fn env_status() -> GitHubEnforcerEnvStatus {
+        let parts = read_github_env_parts();
+        let required_reviewer = std::env::var("DAD_GITHUB_LOGIN")
+            .or_else(|_| std::env::var("GITHUB_REQUIRED_REVIEWER"))
+            .unwrap_or_else(|_| parts.owner.clone());
+        let mandate_ci = env_bool("MANDATE_GITHUB_CI").unwrap_or(true);
+
+        GitHubEnforcerEnvStatus {
+            require_human_approval: parts.require_human_approval,
+            auto_merge_on_approval: parts.auto_merge_on_approval,
+            timeout_hours: parts.timeout_hours,
+            token_present: !parts.token.trim().is_empty(),
+            owner_present: !parts.owner.trim().is_empty(),
+            agents_repo: parts.agents_repo,
+            tools_repo: parts.tools_repo,
+            required_reviewer,
+            mandate_ci,
         }
     }
 
@@ -184,10 +252,10 @@ impl GitHubEnforcer {
             return Err(CreationError::HumanApprovalDisabled);
         }
         if self.token.trim().is_empty() {
-            return Err(CreationError::MissingEnv("GITHUB_PUSH_TOKEN"));
+            return Err(CreationError::MissingGitHubAuth);
         }
         if self.owner.trim().is_empty() {
-            return Err(CreationError::MissingEnv("GITHUB_REPO_OWNER"));
+            return Err(CreationError::MissingGitHubOwner);
         }
 
         // 1. Local tests already passed
@@ -253,7 +321,7 @@ impl GitHubEnforcer {
             return Err(CreationError::HumanApprovalDisabled);
         }
         if self.token.trim().is_empty() {
-            return Err(CreationError::MissingEnv("GITHUB_PUSH_TOKEN"));
+            return Err(CreationError::MissingGitHubAuth);
         }
 
         let _ = self.poll_for_completion(pr_url).await?;

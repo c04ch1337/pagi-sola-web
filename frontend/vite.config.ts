@@ -8,10 +8,11 @@ export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, repoRoot, '');
     return {
       server: {
-        port: 3000,
+        port: parseInt(env.VITE_PORT || '3000', 10),
         host: '0.0.0.0',
         proxy: {
           // Local dev: proxy API calls to the Rust backend.
+          // Backend URL configurable via VITE_PHOENIX_API_BASE (default: http://127.0.0.1:8888)
           '/api': {
             target: env.VITE_PHOENIX_API_BASE || 'http://127.0.0.1:8888',
             changeOrigin: true,

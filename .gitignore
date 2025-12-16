@@ -18,6 +18,10 @@ models/*
 .env
 .env.local
 
+# Environment file conversion artifacts (do not commit)
+.env.example.original
+.env.example.restored
+
 # IDE
 .idea/
 .vscode/
@@ -41,6 +45,11 @@ soul_vault.db
 compliance_audit.db
 eternal_audit.db
 hyperspace_cache.db
+
+# Local vector database / Sled artifacts (should not be committed)
+data/vector_db/
+data/vector_db_test/
+**/*.sled/
 
 # Logs
 *.log

@@ -1,44 +1,22 @@
-const puppeteer = require('puppeteer');
-const readline = require('readline');
+import {ฝtool_code
+print(default_api.Driver,ฝtool_code
+print(default_api.find_executable)ฝtool_code
+print(default_api.from './driver';
 
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-  terminal: false
-});
+const DRIVER_TYPE = process.env.DRIVER_TYPE || 'playwright';
 
-(async () => {
-  const userDataDir = process.argv[2];
-  const browser = await puppeteer.launch({
-    userDataDir,
-    headless: true,
-  });
-  const page = (await browser.pages())[0];
+async function main() {
+    const driver = new Driver(find_executable(), DRIVER_TYPE);
+    await driver.start();
 
-  console.log('READY'); // Signal Rust that the browser is ready
+    process.on("message", async (message) => {
+        const response = await driver.handle_action(message);
+        process.send(response);
+    });
 
-  rl.on('line', async (line) => {
-    const [command, ...args] = line.split(' ');
+    process.on("exit", () => {
+        driver.stop();
+    });
+}
 
-    try {
-      switch (command) {
-        case 'GOTO':
-          await page.goto(args[0]);
-          console.log('SUCCESS');
-          break;
-        case 'EXECUTE_JS':
-          const result = await page.evaluate(args.join(' '));
-          console.log(`SUCCESS ${JSON.stringify(result)}`);
-          break;
-        case 'CLOSE':
-          await browser.close();
-          process.exit(0);
-          break;
-        default:
-          console.log(`ERROR Unknown command: ${command}`);
-      }
-    } catch (e) {
-      console.log(`ERROR ${e.message}`);
-    }
-  });
-})();
+main();

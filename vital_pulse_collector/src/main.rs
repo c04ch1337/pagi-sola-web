@@ -294,7 +294,7 @@ async fn main() -> std::io::Result<()> {
         )
         .init();
 
-    let bind = std::env::var("TELEMETRIST_BIND").unwrap_or_else(|_| "127.0.0.1:5002".to_string());
+    let bind = common_types::ports::VitalPulseCollectorPort::bind();
     let db_path = std::env::var("TELEMETRIST_DB_PATH").unwrap_or_else(|_| "telemetrist.db".to_string());
 
     let db = sled::open(&db_path).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;

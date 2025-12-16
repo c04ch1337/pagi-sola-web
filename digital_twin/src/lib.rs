@@ -10,7 +10,9 @@ pub struct DigitalTwin {
 impl DigitalTwin {
     pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let caps = DesiredCapabilities::firefox();
-        let driver = WebDriver::new("http://localhost:4444/wd/hub", caps).await?;
+        let selenium_url = std::env::var("SELENIUM_HUB_URL")
+            .unwrap_or_else(|_| "http://localhost:4444/wd/hub".to_string());
+        let driver = WebDriver::new(&selenium_url, caps).await?;
         Ok(Self { driver: Some(driver) })
     }
 

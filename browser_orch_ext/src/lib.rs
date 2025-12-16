@@ -1,67 +1,89 @@
-use std::io::{BufRead, BufReader, Write};
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
-// Represents the browser process
-pub struct Browser {
-    process: Child,
-    stdin: ChildStdin,
-    stdout: BufReader<ChildStdout>,
+pub mod orchestrator;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct Viewport {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+    pub scale: f64,
 }
 
-impl Browser {
-    // Launch a new browser instance with a persistent user profile
-    pub fn launch(user_data_dir: &str) -> Result<Self, std::io::Error> {
-        let mut process = Command::new("node")
-            .arg("browser_orch_ext/main.js")
-            .arg(user_data_dir)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .spawn()?;
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ElementState {
+    pub attributes: Vec<(String, String)>,
+    pub r: Option<String>,
+    pub name: String,
+    pub metadata: ElementMetadata,
+}
 
-        let stdin = process.stdin.take().expect("Failed to open stdin");
-        let stdout = BufReader::new(process.stdout.take().expect("Failed to open stdout"));
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ElementMetadata {
+    pub tag_name: String,
+    pub r#type: Option<String>,
+    pub has_value: bool,
+    pub is_checked: bool,
+    pub is_disabled: bool,
+    pub is_required: bool,
+    pub is_read_only: bool,
+}
 
-        let mut browser = Self { process, stdin, stdout };
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "action")]
+pub enum Action {
+    /// Navigates to a new URL.
+    Navigate { url: String },
+    /// Gets the current state of a page.
+    State,
+    /// Hovers over a single element. I is the element to hover over.
+    Hover { i: usize },
+    /// Clicks a single element. I is the element to click. Required to be inside the viewport.
+    Click { i: usize },
+    /// Types into a single element. I is the element to type into. Required to be inside the viewport.
+    Type { i: usize, text: String },
+    /// Scrolls the page by a given amount.
+    Scroll { x: f64, y: f64 },
+    /// Selects a value for a select element. I is the element to select.
+    Select { i: usize, value: String },
+}
 
-        // Wait for the "READY" signal from the Node.js script
-        let mut line = String::new();
-        browser.stdout.read_line(&mut line)?;
-        if !line.starts_with("READY") {
-            return Err(std::io::Error::new(std::io::ErrorKind::Other, "Failed to launch browser"));
-        }
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct PageState {
+    pub viewport: Viewport,
+    pub elements: Vec<ElementState>,
+}
 
-        Ok(browser)
-    }
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "type")]
+pub enum DriverError {
+    /// The element specified was not found.
+    ElementNotFound,
+    /// The action failed to execute.
+    ActionFailed,
+    /// The driver is not running.
+    NotRunning,
+    /// The viewport is not set.
+    ViewportNotSet,
+}
 
-    fn send_command(&mut self, command: &str) -> Result<String, std::io::Error> {
-        self.stdin.write_all(command.as_bytes())?;
-        self.stdin.write_all(b"\n")?;
-
-        let mut line = String::new();
-        self.stdout.read_line(&mut line)?;
-
-        if line.starts_with("SUCCESS") {
-            Ok(line.strip_prefix("SUCCESS ").unwrap_or("").trim().to_string())
-        } else {
-            Err(std::io::Error::new(std::io::ErrorKind::Other, line))
-        }
-    }
-
-    // Go to a specific URL
-    pub fn goto(&mut self, url: &str) -> Result<(), std::io::Error> {
-        self.send_command(&format!("GOTO {}", url))?;
-        Ok(())
-    }
-
-    // Execute arbitrary JavaScript on the page
-    pub fn execute_js(&mut self, js_code: &str) -> Result<String, std::io::Error> {
-        self.send_command(&format!("EXECUTE_JS {}", js_code))
-    }
-
-    // Close the browser
-    pub fn close(&mut self) -> Result<(), std::io::Error> {
-        self.send_command("CLOSE")?;
-        self.process.wait()?;
-        Ok(())
-    }
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum DriverResponse {
+    /// The state of the page.
+    State(PageState),
+    /// The action was completed.
+    Complete,
+    /// An error occurred.
+    Error(DriverError),
+    /// The driver is ready to accept commands.
+    Ready,
 }

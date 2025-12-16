@@ -1,6 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Tailwind v4 entrypoint */
+@import "tailwindcss";
+@config "./tailwind.config.cjs";
 
 /* frontend/styles.css
  *
@@ -35,6 +35,30 @@ body {
   background: linear-gradient(to right, #f472b6, #a78bfa);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+/* Semantic memory UI helpers */
+.semantic-highlight {
+  background: rgba(244, 63, 94, 0.22);
+  color: #fff;
+  padding: 0 2px;
+  border-radius: 4px;
+}
+
+@keyframes heartGlow {
+  0% {
+    box-shadow: 0 0 0 rgba(244, 63, 94, 0.0);
+  }
+  50% {
+    box-shadow: 0 0 22px rgba(244, 63, 94, 0.22);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(244, 63, 94, 0.0);
+  }
+}
+
+.semantic-emotion-glow {
+  animation: heartGlow 1.8s ease-in-out infinite;
 }
 
 /* Custom scrollbar */

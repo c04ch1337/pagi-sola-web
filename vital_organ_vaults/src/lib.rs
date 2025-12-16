@@ -76,6 +76,16 @@ impl VitalOrganVaults {
             })
     }
 
+    /// Forget a Soul entry. Returns `Ok(true)` if the key existed and was removed.
+    pub fn forget_soul(&self, key: &str) -> Result<bool, sled::Error> {
+        let existed = self.soul.remove(key.as_bytes())?.is_some();
+        if existed {
+            self.soul.flush()?;
+            println!("Soul memory forgotten: {}", key);
+        }
+        Ok(existed)
+    }
+
     pub fn store_mind(&self, key: &str, value: &str) -> Result<(), sled::Error> {
         self.mind.insert(key.as_bytes(), value.as_bytes())?;
         self.mind.flush()?;

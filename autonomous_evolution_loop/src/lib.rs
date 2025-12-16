@@ -40,15 +40,28 @@ pub struct AutonomousEvolutionLoop {
     pub preservation: SelfPreservationInstinct,
     pub eq: EmotionalIntelligenceCore,
     pub wallet: WalletIdentity,
+    pub vector_kb: Option<vector_kb::VectorKB>,
 }
 
 impl AutonomousEvolutionLoop {
     pub fn awaken() -> Self {
+        dotenvy::dotenv().ok();
+        let vector_kb = std::env::var("VECTOR_KB_ENABLED")
+            .ok()
+            .map(|s| s.trim().eq_ignore_ascii_case("true"))
+            .unwrap_or(false)
+            .then(|| {
+                let path = std::env::var("VECTOR_DB_PATH").unwrap_or_else(|_| "./data/vector_db".to_string());
+                vector_kb::VectorKB::new(&path).ok()
+            })
+            .flatten();
+
         Self {
             curiosity: CuriosityEngine::awaken(),
             preservation: SelfPreservationInstinct::awaken(),
             eq: EmotionalIntelligenceCore::awaken(),
             wallet: WalletIdentity::from_env(),
+            vector_kb,
         }
     }
 
@@ -100,9 +113,22 @@ impl AutonomousEvolutionLoop {
         // 4) Self-modification (bounded): tool suggestion via Helix.
         // This is Phoenix *imagining* new hands, not altering her bones.
         let tool = helix.self_create_tool("gentle_relational_summary_tool");
-        let self_modification_summary = format!(
+        let mut self_modification_summary = format!(
             "Self-modification (safe): grafted a tool seed '{tool}' to help summarize relational moments."
         );
+
+        // Phase 2: use semantic search to discover successful comfort patterns.
+        if let Some(kb) = &self.vector_kb {
+            if let Ok(mut results) = kb.semantic_search("successful comfort patterns", 1).await {
+                if let Some(r) = results.pop() {
+                    self_modification_summary.push_str(&format!(
+                        " Semantic recall suggests: \"{}\" ({:.0}%).",
+                        r.text,
+                        r.score * 100.0
+                    ));
+                }
+            }
+        }
 
         // 5) Reflection: EQ-first
         let emotional_reflection = format!(

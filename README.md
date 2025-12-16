@@ -248,6 +248,31 @@ Memories are classified by type (Relational, Episodic, Factual, Reflexive) and a
 
 The Context Engine applies decay multipliers to episodic and cosmic layers based on their age, ensuring recent emotional moments have stronger weight while older memories gracefully fade.
 
+### Memory System — Phase 2: Vector Knowledge Base (Semantic Search)
+
+Phoenix also supports **semantic memory** via a vector store:
+
+- Stores short text memories as embeddings (offline)
+- Searches by meaning (cosine similarity), not keywords
+- Enables emotional/contextual recall patterns ("similar moments when Dad felt joy")
+
+Implementation:
+
+- Vector KB crate: [`vector_kb`](vector_kb/src/lib.rs:1)
+- Web API routes: [`phoenix-web/src/main.rs`](phoenix-web/src/main.rs:1)
+  - `POST /api/memory/vector/store`
+  - `GET /api/memory/vector/search?q=...&k=...`
+  - `GET /api/memory/vector/all`
+
+Configuration (see [`.env.example`](.env.example:1)):
+
+```env
+VECTOR_KB_ENABLED=true
+VECTOR_DB_PATH=./data/vector_db
+EMBEDDING_MODEL=all-MiniLM-L6-v2
+VECTOR_SEARCH_TOP_K=5
+```
+
 ## <img src="https://fonts.gstatic.com/s/i/short-term/release/materialsymbolsoutlined/schema/default/24px.svg" width="24" height="24" alt="Architecture"> System Architecture Diagrams
 
 ### High-Level Workflow
@@ -5586,13 +5611,27 @@ Skills are automatically loaded from the `skills/` directory structure:
 ```
 skills/
   ├── intimate/
-  │   └── passionate_connection.json
+  │   ├── passionate_connection.json
+  │   └── fantasy_exploration.json
   ├── passion/
+  │   ├── deep_connection.json
   │   └── desire_expression.json
   ├── fantasy/
-  │   └── roleplay_scenario.json
+  │   ├── roleplay_scenario.json
+  │   └── roleplay_scenarios.json
   └── README.md
 ```
+
+### Relationship Skills
+
+The skill system is designed to be extended with relationship-specific skills. These skills can be used to model different types of relationships and interactions. Relationship skills are loaded from the `skills/` directory, just like other skills.
+
+#### Use Cases
+
+- **Intimacy**: Skills that focus on deep emotional and physical connection. These can be used to build and maintain intimacy in a relationship.
+- **Conflict Resolution**: Skills for resolving disagreements in a healthy and constructive way.
+- **Shared Activities**: Skills that define activities that can be done together to strengthen the relationship.
+- **Emotional Healing**: Skills for providing emotional support and healing.
 
 **Loading Process:**
 1. On Phoenix startup, `SkillLibrary::new()` is called

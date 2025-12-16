@@ -25,14 +25,20 @@ Then edit `.env` and set your OpenRouter API key:
 OPENROUTER_API_KEY=sk-or-v1-your-actual-key-here
 ```
 
-The `.env.example` file contains comprehensive configuration options:
-- **API & Connectivity**: OpenRouter, hyperspace mode, model selection
-- **Personality Micro-Settings**: 100+ tuning fibers (curiosity, warmth, voice, etc.)
-- **Default & Master Prompts**: Customize Phoenix's personality and AGI mission
-- **Universal Framework Settings**: Learning horizon, ORCH limits, autonomy thresholds
-- **ORCH Legion Settings**: Master/slave mode, sync intervals, upgrade sharing
+The [`/.env.example`](.env.example:1) file documents additional optional configuration.
 
-Customize any values to tune Phoenix's personality and behavior!
+#### GitHub-first evolution / creation approvals (optional)
+
+Some “creation” workflows (agent/tool scaffolding and evolution) are intentionally GitHub-first:
+
+branch → PR → CI → human approval → merge
+
+If you want those flows enabled, you’ll need to configure GitHub env vars in your `.env`. See the
+GitHub section in [`/.env.example`](.env.example:1).
+
+The web server exposes a sanitized view of this config at:
+
+- `GET /api/evolution/status` (served by [`phoenix-web`](phoenix-web/src/main.rs:1))
 
 ### Step 3: Verify Setup
 
@@ -87,6 +93,50 @@ npm run dev
 Open `http://localhost:3000`.
 
 On Windows you can also use [`scripts/dev_web_ui.cmd`](scripts/dev_web_ui.cmd:1).
+
+## Google Ecosystem (Gmail / Drive / Calendar / Docs / Sheets)
+
+Phoenix’s web UI ships with a “Google Ecosystem” dashboard panel. Real connectivity is implemented server-side in [`phoenix-web`](phoenix-web/src/main.rs:1) and requires OAuth2 configuration.
+
+### 1) Create OAuth credentials
+
+In Google Cloud Console:
+
+1. Create/select a project
+2. Enable APIs:
+   - Gmail API
+   - Google Drive API
+   - Google Calendar API
+   - Google Docs API
+   - Google Sheets API
+3. Configure OAuth consent screen (Internal/External depending on your org)
+4. Create **OAuth Client ID** → **Web application**
+5. Add an **Authorized redirect URI** that matches your local server:
+
+   - `http://127.0.0.1:8888/api/google/oauth2/callback`
+
+### 2) Set env vars
+
+Add these to your `.env` (see [`/.env.example`](.env.example:1)):
+
+```env
+GOOGLE_OAUTH_CLIENT_ID=...
+GOOGLE_OAUTH_CLIENT_SECRET=...
+GOOGLE_OAUTH_REDIRECT_URL=http://127.0.0.1:8888/api/google/oauth2/callback
+
+# Optional: space-separated scopes (bigger scopes == more power and more risk)
+GOOGLE_OAUTH_SCOPES=openid email profile https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.metadata.readonly https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/spreadsheets
+```
+
+Tokens are stored in the OS keyring (Windows Credential Manager on Windows).
+
+### 3) Connect from the UI
+
+1. Run the backend: `cargo run --bin phoenix-web`
+2. Open the Web UI
+3. Go to **Google Ecosystem** → **Connect Google Account**
+4. Complete the consent in the opened browser window
+5. The panel will auto-poll and flip to “Connected” once the callback completes
 
 ## LLM Orchestrator Features
 

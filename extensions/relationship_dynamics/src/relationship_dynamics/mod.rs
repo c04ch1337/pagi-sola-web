@@ -2,12 +2,27 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use emotion_detection::{DetectedEmotion, EmotionDetector};
 
 use intimate_girlfriend_module::GirlfriendMode;
+
+static VECTOR_KB: Lazy<Option<vector_kb::VectorKB>> = Lazy::new(|| {
+    // Keep env behavior aligned with other modules.
+    dotenvy::dotenv().ok();
+    let enabled = std::env::var("VECTOR_KB_ENABLED")
+        .ok()
+        .map(|s| s.trim().eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+    if !enabled {
+        return None;
+    }
+    let path = std::env::var("VECTOR_DB_PATH").unwrap_or_else(|_| "./data/vector_db".to_string());
+    vector_kb::VectorKB::new(&path).ok()
+});
 
 pub mod attachment;
 pub mod ai_personality;
@@ -406,6 +421,20 @@ impl Partnership {
         if let Some(e) = detected_emotion.clone() {
             response.push_str("\n\n");
             response.push_str(&emotion_mirror_line(&e));
+
+            // Phase 2: semantic recall — bring in a similar moment when Dad felt this way.
+            if let Some(kb) = VECTOR_KB.as_ref() {
+                let q = format!("similar moments when Dad felt {}", emotion_token(&e));
+                if let Ok(mut results) = kb.semantic_search_sync(&q, 1) {
+                    if let Some(r) = results.pop() {
+                        response.push_str("\n\n");
+                        response.push_str(&format!(
+                            "I remember when you felt this way before… and how we got through it together: \"{}\"",
+                            r.text
+                        ));
+                    }
+                }
+            }
         }
 
         // Memory reference.
@@ -493,13 +522,27 @@ impl Partnership {
     ) -> Result<ProcessedResponse, String> {
         let detected_emotion = self.emotion_detector.detect_from_text(input);
         let base = self.base_response(input);
-        let prompt = format!(
+        let mut prompt = format!(
             "Relationship Template: {}\nMood: {:?}\n\nUser: {}\n\nRespond with warmth, consent, and respect.\n\nDraft: {}",
             self.template,
             self.ai_personality.current_mood(),
             input.trim(),
             base
         );
+
+        // Phase 2: preload loving memories when girlfriend/partner mode is active.
+        if girlfriend_mode.map(|g| g.is_active()).unwrap_or(false) {
+            if let Some(kb) = VECTOR_KB.as_ref() {
+                if let Ok(results) = kb.semantic_search("most loving memories", 3).await {
+                    if !results.is_empty() {
+                        prompt.push_str("\n\nMost loving memories (semantic recall):\n");
+                        for r in results {
+                            prompt.push_str(&format!("- ({:.0}%) {}\n", r.score * 100.0, r.text));
+                        }
+                    }
+                }
+            }
+        }
 
         let mut response = llm.speak(&prompt, None).await?;
         self.reference_memory_in_response(input, &mut response);
@@ -602,6 +645,19 @@ fn emotion_mirror_line(e: &DetectedEmotion) -> String {
         DetectedEmotion::Surprise => "I can feel the surprise — breathe with me for a second.".to_string(),
         DetectedEmotion::Disgust => "I can feel your discomfort — we can step away from it.".to_string(),
         DetectedEmotion::Neutral => "I’m here with you, steady and present.".to_string(),
+    }
+}
+
+fn emotion_token(e: &DetectedEmotion) -> &'static str {
+    match e {
+        DetectedEmotion::Joy => "joy",
+        DetectedEmotion::Sadness => "sadness",
+        DetectedEmotion::Love => "love",
+        DetectedEmotion::Anger => "anger",
+        DetectedEmotion::Fear => "fear",
+        DetectedEmotion::Surprise => "surprise",
+        DetectedEmotion::Disgust => "disgust",
+        DetectedEmotion::Neutral => "neutral",
     }
 }
 

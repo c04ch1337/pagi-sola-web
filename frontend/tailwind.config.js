@@ -1,5 +1,5 @@
 /** @type {import('tailwindcss').Config} */
-module.exports = {
+export default {
   // Include all frontend source files so Tailwind can see every class.
   content: ['./index.html', './**/*.{js,jsx,ts,tsx}'],
   theme: {
@@ -73,4 +73,3 @@ module.exports = {
   },
   plugins: [],
 };
-

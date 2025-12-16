@@ -210,7 +210,7 @@ async fn main() -> std::io::Result<()> {
         )
         .init();
 
-    let bind = std::env::var("PULSE_DISTRIBUTOR_BIND").unwrap_or_else(|_| "127.0.0.1:5003".to_string());
+    let bind = common_types::ports::SynapticPulseDistributorPort::bind();
 
     let (tx, _rx) = broadcast::channel::<UpdateEnvelope>(2048);
     let state = web::Data::new(AppState { tx });
