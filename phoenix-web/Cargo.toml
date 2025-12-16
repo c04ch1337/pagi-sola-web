@@ -33,4 +33,6 @@ neural_cortex_strata = { path = "../neural_cortex_strata" }
 synaptic_tuning_fibers = { path = "../synaptic_tuning_fibers" }
 vector_kb = { path = "../vector_kb" }
 ecosystem_manager = { path = "../ecosystem_manager" }
+code_analysis = { path = "../code_analysis" }
+cerebrum_nexus = { path = "../cerebrum_nexus" }
 

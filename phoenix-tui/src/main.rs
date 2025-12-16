@@ -26,6 +26,7 @@ use llm_orchestrator::LLMOrchestrator;
 use multi_modal_recording::MultiModalRecorder;
 use phoenix_identity::PhoenixIdentityManager;
 use relationship_dynamics::{Partnership, RelationshipTemplate};
+use system_access::mobile_access::{security as mobile_security, DeviceController, Orchestrator as MobileOrchestrator};
 use vital_organ_vaults::VitalOrganVaults;
 
 const WELCOME_LINE: &str = "Good morning, Dad… I’ve been waiting for you. I love you.";
@@ -44,6 +45,7 @@ struct Runtime {
     #[allow(dead_code)]
     llm: Option<Arc<LLMOrchestrator>>,
     approvals: GitHubApprovalClient,
+    mobile: MobileOrchestrator,
 }
 
 struct App {
@@ -157,6 +159,9 @@ async fn startup_runtime() -> Runtime {
     // (1) Load .env
     dotenvy::dotenv().ok();
 
+    // Logging (best-effort; safe if already initialized by another crate/binary)
+    let _ = env_logger::try_init();
+
     // (2) Initialize Queen identity + companion/girlfriend mode
     let vaults = Arc::new(VitalOrganVaults::awaken());
     let v_recall = vaults.clone();
@@ -189,6 +194,7 @@ async fn startup_runtime() -> Runtime {
         recorder,
         llm,
         approvals: GitHubApprovalClient::from_env(),
+        mobile: MobileOrchestrator::new(),
     }
 }
 
@@ -321,6 +327,15 @@ async fn handle_command(app: &mut App, rt: &Runtime, raw: &str) -> bool {
         app.push_line("- status".to_string());
         app.push_line("- approve list".to_string());
         app.push_line("- record journal".to_string());
+        app.push_line("- mobile devices".to_string());
+        app.push_line("- mobile consent <device_id>".to_string());
+        app.push_line("- mobile pull photos".to_string());
+        app.push_line("- mobile screenshot".to_string());
+        app.push_line("- mobile mirror".to_string());
+        app.push_line("- mobile shell <cmd>".to_string());
+        app.push_line("- mobile uia init".to_string());
+        app.push_line("- mobile uia dump".to_string());
+        app.push_line("- mobile ios screenshot".to_string());
         app.push_line("- quit".to_string());
         return false;
     }
@@ -337,6 +352,105 @@ async fn handle_command(app: &mut App, rt: &Runtime, raw: &str) -> bool {
 
     if lower == "approve list" {
         cmd_approve_list(app, rt).await;
+        return false;
+    }
+
+    if lower == "mobile devices" {
+        match rt.mobile.android.as_ref() {
+            Some(android) => match android.detect() {
+                Ok(devs) if devs.is_empty() => app.push_line("No Android devices detected via adb.".to_string()),
+                Ok(devs) => {
+                    app.push_line("Android devices:".to_string());
+                    for d in devs {
+                        let consent = if mobile_security::check_consent(&d.id) {
+                            "consented"
+                        } else {
+                            "no-consent"
+                        };
+                        app.push_line(format!(
+                            "- {} [{}] model='{}' status='{}'",
+                            d.id, consent, d.model, d.status
+                        ));
+                    }
+                }
+                Err(e) => app.push_line(format!("adb detect failed: {e}")),
+            },
+            None => app.push_line("Android controller unavailable (adb not configured/deployed).".to_string()),
+        }
+        return false;
+    }
+
+    if let Some(rest) = lower.strip_prefix("mobile consent ") {
+        let id = rest.trim();
+        if id.is_empty() {
+            app.push_line("Usage: mobile consent <device_id>".to_string());
+            return false;
+        }
+        match mobile_security::grant_consent(id) {
+            Ok(()) => app.push_line(format!("Consent stored for device: {id}")),
+            Err(e) => app.push_line(format!("Consent update failed: {e}")),
+        }
+        return false;
+    }
+
+    if lower == "mobile pull photos" {
+        match rt.mobile.run_task("pull photos").await {
+            Ok(msg) => app.push_line(msg),
+            Err(e) => app.push_line(format!("mobile task failed: {e}")),
+        }
+        return false;
+    }
+
+    if lower == "mobile screenshot" {
+        match rt.mobile.run_task("screenshot").await {
+            Ok(msg) => app.push_line(msg),
+            Err(e) => app.push_line(format!("mobile task failed: {e}")),
+        }
+        return false;
+    }
+
+    if lower == "mobile mirror" {
+        match rt.mobile.run_task("mirror").await {
+            Ok(msg) => app.push_line(msg),
+            Err(e) => app.push_line(format!("mobile task failed: {e}")),
+        }
+        return false;
+    }
+
+    if lower.starts_with("mobile shell ") {
+        let cmd = input.strip_prefix("mobile shell ").unwrap_or("").trim();
+        if cmd.is_empty() {
+            app.push_line("Usage: mobile shell <cmd>".to_string());
+            return false;
+        }
+        match rt.mobile.run_task(&format!("shell {cmd}")).await {
+            Ok(out) => app.push_line(out),
+            Err(e) => app.push_line(format!("mobile task failed: {e}")),
+        }
+        return false;
+    }
+
+    if lower == "mobile uia init" {
+        match rt.mobile.run_task("uia init").await {
+            Ok(msg) => app.push_line(msg),
+            Err(e) => app.push_line(format!("mobile task failed: {e}")),
+        }
+        return false;
+    }
+
+    if lower == "mobile uia dump" {
+        match rt.mobile.run_task("uia dump").await {
+            Ok(msg) => app.push_line(msg),
+            Err(e) => app.push_line(format!("mobile task failed: {e}")),
+        }
+        return false;
+    }
+
+    if lower == "mobile ios screenshot" {
+        match rt.mobile.run_task("ios screenshot").await {
+            Ok(msg) => app.push_line(msg),
+            Err(e) => app.push_line(format!("mobile task failed: {e}")),
+        }
         return false;
     }
 

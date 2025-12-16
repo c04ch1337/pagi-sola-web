@@ -72,6 +72,11 @@ export class Driver {
     }
 
     async handle_action(action) {
+        // Only playwright driver type supports page actions
+        if (this.driver_type !== 'playwright' || !this.page) {
+            return { type: "Error", error: "Action not supported for this driver type" };
+        }
+
         switch (action.action) {
             case 'Navigate':
                 await this.page.goto(action.url);

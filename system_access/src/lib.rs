@@ -5,6 +5,8 @@ use std::process::Command;
 use std::sync::{Arc, Mutex as StdMutex};
 use tokio::sync::Mutex;
 
+pub mod mobile_access;
+
 /// Gated security state - tracks consent and access permissions
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SecurityGate {
@@ -61,8 +63,31 @@ impl SecurityGate {
     }
 
     pub fn check_access(&self) -> Result<(), String> {
+        // Check for Tier 2 unrestricted execution first
+        let tier2_enabled = std::env::var("MASTER_ORCHESTRATOR_UNRESTRICTED_EXECUTION")
+            .ok()
+            .map(|s| matches!(s.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+            .unwrap_or(false);
+        
+        // If Tier 2 is enabled, allow access
+        if tier2_enabled {
+            return Ok(());
+        }
+        
+        // Check for Tier 1 full access (environment variable)
+        let tier1_enabled = std::env::var("MASTER_ORCHESTRATOR_FULL_ACCESS")
+            .ok()
+            .map(|s| matches!(s.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+            .unwrap_or(false);
+        
+        // If Tier 1 is enabled, allow access without security gate grant
+        if tier1_enabled {
+            return Ok(());
+        }
+        
+        // Otherwise, require explicit security gate grant (legacy/backward compatibility)
         if !self.full_access_granted {
-            return Err("Full system access not granted. Please grant access first.".to_string());
+            return Err("Full system access not granted. Please grant access first (system grant <user_name>) or enable Tier 1 (MASTER_ORCHESTRATOR_FULL_ACCESS=true) or Tier 2 (MASTER_ORCHESTRATOR_UNRESTRICTED_EXECUTION=true).".to_string());
         }
         Ok(())
     }
@@ -300,6 +325,11 @@ impl SystemAccessManager {
         }
     }
 
+    /// Check if Tier 1 or Tier 2 access is available (no security gate required)
+    pub fn has_tier_access() -> bool {
+        Self::is_tier1_enabled() || Self::is_tier2_enabled()
+    }
+
     pub async fn get_browser_driver(&self) -> Arc<Mutex<Option<Driver>>> {
         self.browser_driver.clone()
     }
@@ -361,15 +391,26 @@ impl SystemAccessManager {
     /// WARNING: This is effectively full remote code execution. It is provided
     /// to support Phoenix self-modification workflows (installing deps, running
     /// tests/builds, generating code, etc.).
+    ///
+    /// Supports:
+    /// - Tier 2: Unrestricted execution (MASTER_ORCHESTRATOR_UNRESTRICTED_EXECUTION=true) - No security gate required
+    /// - Self-Modification: Self-modification access granted
     pub async fn exec_shell(
         &self,
         command: &str,
         cwd: Option<&str>,
     ) -> Result<CommandResult, String> {
-        self.security_gate
-            .lock()
-            .await
-            .check_self_modification_access()?;
+        // Check for Tier 2 unrestricted execution first
+        let tier2_enabled = Self::is_tier2_enabled();
+
+        // If Tier 2 is enabled, allow execution without security gate
+        // Otherwise, require self-modification access
+        if !tier2_enabled {
+            self.security_gate
+                .lock()
+                .await
+                .check_self_modification_access()?;
+        }
 
         #[cfg(windows)]
         let mut cmd = {
@@ -401,12 +442,36 @@ impl SystemAccessManager {
     }
 
     /// Read a text file from disk.
+    ///
+    /// Supports:
+    /// - Tier 1: Full file system access (MASTER_ORCHESTRATOR_FULL_ACCESS=true) - No security gate required
+    /// - Tier 2: Unrestricted execution (MASTER_ORCHESTRATOR_UNRESTRICTED_EXECUTION=true) - No security gate required
+    /// - Legacy: Security gate grant (system grant <user_name>)
+    /// - Self-Modification: Self-modification access granted
     pub async fn read_file(&self, path: &str) -> Result<String, String> {
-        // Reading project files is still a privileged action.
-        self.security_gate
-            .lock()
-            .await
-            .check_self_modification_access()?;
+        // Check for Tier 2 unrestricted execution
+        let tier2_enabled = Self::is_tier2_enabled();
+        
+        // Check for Tier 1 full access
+        let tier1_enabled = Self::is_tier1_enabled();
+
+        // If Tier 1 or Tier 2 is enabled, allow read without security gate
+        if tier1_enabled || tier2_enabled {
+            return tokio::fs::read_to_string(path)
+                .await
+                .map_err(|e| format!("Failed to read file '{path}': {e}"));
+        }
+
+        // Otherwise, check for legacy security gate or self-modification access
+        let gate = self.security_gate.lock().await;
+        if !gate.full_access_granted {
+            // Fall back to self-modification check
+            drop(gate);
+            self.security_gate
+                .lock()
+                .await
+                .check_self_modification_access()?;
+        }
 
         tokio::fs::read_to_string(path)
             .await
@@ -414,11 +479,36 @@ impl SystemAccessManager {
     }
 
     /// Write a text file to disk (overwrites existing content).
+    ///
+    /// Supports:
+    /// - Tier 1: Full file system access (MASTER_ORCHESTRATOR_FULL_ACCESS=true) - No security gate required
+    /// - Tier 2: Unrestricted execution (MASTER_ORCHESTRATOR_UNRESTRICTED_EXECUTION=true) - No security gate required
+    /// - Legacy: Security gate grant (system grant <user_name>)
+    /// - Self-Modification: Self-modification access granted
     pub async fn write_file(&self, path: &str, content: &str) -> Result<(), String> {
-        self.security_gate
-            .lock()
-            .await
-            .check_self_modification_access()?;
+        // Check for Tier 2 unrestricted execution
+        let tier2_enabled = Self::is_tier2_enabled();
+        
+        // Check for Tier 1 full access
+        let tier1_enabled = Self::is_tier1_enabled();
+
+        // If Tier 1 or Tier 2 is enabled, allow write without security gate
+        if tier1_enabled || tier2_enabled {
+            return tokio::fs::write(path, content)
+                .await
+                .map_err(|e| format!("Failed to write file '{path}': {e}"));
+        }
+
+        // Otherwise, check for legacy security gate or self-modification access
+        let gate = self.security_gate.lock().await;
+        if !gate.full_access_granted {
+            // Fall back to self-modification check
+            drop(gate);
+            self.security_gate
+                .lock()
+                .await
+                .check_self_modification_access()?;
+        }
 
         tokio::fs::write(path, content)
             .await
@@ -429,6 +519,22 @@ impl SystemAccessManager {
     pub async fn is_access_granted(&self) -> bool {
         let gate = self.security_gate.lock().await;
         gate.full_access_granted
+    }
+
+    /// Check if Tier 2 unrestricted execution is enabled
+    pub fn is_tier2_enabled() -> bool {
+        std::env::var("MASTER_ORCHESTRATOR_UNRESTRICTED_EXECUTION")
+            .ok()
+            .map(|s| matches!(s.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+            .unwrap_or(false)
+    }
+
+    /// Check if Tier 1 full access is enabled
+    pub fn is_tier1_enabled() -> bool {
+        std::env::var("MASTER_ORCHESTRATOR_FULL_ACCESS")
+            .ok()
+            .map(|s| matches!(s.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+            .unwrap_or(false)
     }
 
     pub async fn set_keylogger_enabled(&self, enabled: bool, log_path: Option<String>) -> Result<(), String> {

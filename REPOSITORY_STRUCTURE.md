@@ -17,9 +17,7 @@ phoenix-2.0/
 ├── Cargo.lock                            # Dependency lock file
 ├── README.md                             # Main project documentation
 ├── SETUP.md                              # Setup instructions
-├── GITHUB_AGENT_INTEGRATION.md          # GitHub agent integration docs
-├── IDENTITY_PERSISTENCE.md               # Identity persistence documentation
-├── orch_repos_docs.md                    # ORCH repositories documentation
+├── REPOSITORY_STRUCTURE.md               # Repository structure documentation
 │
 ├── agent_spawner/                        # Agent spawning system
 │   ├── Cargo.toml
@@ -65,8 +63,45 @@ phoenix-2.0/
 │   └── src/
 │       └── lib.rs                        # Question generation for connection
 │
-├── docs/                                 # Additional documentation
-│   └── README.md
+├── docs/                                 # Documentation directory
+│   ├── README.md                         # Documentation index
+│   ├── integration/                      # Integration documentation
+│   │   ├── README.md
+│   │   ├── GITHUB_AGENT_INTEGRATION.md
+│   │   ├── GOOGLE_ECOSYSTEM_WIRING_CONFIRMATION.md
+│   │   ├── MASTER_ORCHESTRATOR_FRONTEND_WIRING_CONFIRMATION.md
+│   │   ├── MASTER_ORCHESTRATOR_INTEGRATION.md
+│   │   └── MEMORY_KB_INTEGRATION_REVIEW.md
+│   ├── ecosystem/                        # Ecosystem documentation
+│   │   ├── README.md
+│   │   ├── ECOSYSTEM_DESIGN.md
+│   │   ├── ECOSYSTEM_IMPLEMENTATION_COMPLETE.md
+│   │   ├── ECOSYSTEM_IMPLEMENTATION_PLAN.md
+│   │   ├── ECOSYSTEM_IMPLEMENTATION_SUMMARY.md
+│   │   └── orch_repos_docs.md
+│   ├── reviews/                          # Audit and review documentation
+│   │   ├── README.md
+│   │   ├── AUDIT_FINDINGS.md
+│   │   ├── AUDIT_SUMMARY.md
+│   │   └── VERIFICATION.md
+│   ├── plans/                            # Planning documentation
+│   │   ├── README.md
+│   │   ├── process_management_plan.md
+│   │   ├── system_access_plan.md
+│   │   └── system_access_matrix.md
+│   ├── CONTEXT_ENGINEERING_ARCHITECTURE.md
+│   ├── MULTI_MODAL_ARCHITECTURE.md
+│   ├── FULL_CONTROL_ACCESS_ARCHITECTURE.md
+│   ├── SKILL_SYSTEM_ARCHITECTURE.md
+│   ├── GIRLFRIEND_FRAMEWORK_ARCHITECTURE.md
+│   ├── MASTER_ORCHESTRATION_ARCHITECTURE.md
+│   ├── LAYERED_KNOWLEDGE_BASE_ARCHITECTURE.md
+│   ├── LAYERED_MEMORY_ARCHITECTURE.md
+│   ├── TELEMETRY_HIVE_SWARM_ARCHITECTURE.md
+│   ├── IDENTITY_PERSISTENCE.md
+│   ├── PORTS.md
+│   ├── SKILL.md
+│   └── [other architecture and design docs]
 │
 ├── dream_healing/                        # Therapeutic dream sessions
 │   ├── Cargo.toml
@@ -350,7 +385,7 @@ phoenix-2.0/
 - **Total Source Files**: 100+ Rust source files
 - **Templates**: 7 template files
 - **Scripts**: 3 utility scripts
-- **Documentation**: 5 markdown files
+- **Documentation**: 30+ markdown files (organized in docs/ subdirectories)
 - **GitHub Workflows**: 3 CI/CD workflows
 
 ## Key Directories
@@ -368,9 +403,13 @@ phoenix-2.0/
 ### Documentation
 - `README.md`: Main project documentation
 - `SETUP.md`: Setup instructions
-- `GITHUB_AGENT_INTEGRATION.md`: GitHub integration docs
-- `IDENTITY_PERSISTENCE.md`: Identity persistence docs
-- `orch_repos_docs.md`: ORCH repositories docs
+- `REPOSITORY_STRUCTURE.md`: Repository structure documentation
+- `docs/`: Comprehensive documentation directory
+  - `integration/`: Integration and wiring confirmation docs
+  - `ecosystem/`: Ecosystem Manager documentation
+  - `reviews/`: Audit and verification documents
+  - `plans/`: Planning and implementation plans
+  - Architecture documents (CONTEXT_ENGINEERING_ARCHITECTURE.md, etc.)
 
 ### Templates
 - `templates/`: All agent, tool, and extension templates

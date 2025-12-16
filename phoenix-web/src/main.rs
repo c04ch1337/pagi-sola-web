@@ -30,6 +30,8 @@ use context_engine::{ContextEngine, ContextRequest, ContextMemory, ContextLayer}
 use neural_cortex_strata::{NeuralCortexStrata, MemoryLayer};
 use std::time::{SystemTime, UNIX_EPOCH};
 use ecosystem_manager::EcosystemManager;
+// ToolAgent and ToolAgentConfig are used in handle_unrestricted_execution
+// but imported there via use statement
 
 mod google;
 use google::{GoogleInitError, GoogleManager};
@@ -697,6 +699,322 @@ async fn store_episodic_memory(state: &AppState, user_input: &str, response: &st
     }
 }
 
+/// Handle system access commands (Tier 1 & Tier 2)
+async fn handle_system_command(state: &AppState, cmd: &str) -> serde_json::Value {
+    
+    let parts: Vec<&str> = cmd.split_whitespace().collect();
+    if parts.len() < 2 {
+        return json!({
+            "type": "error",
+            "message": "Usage: system <operation> [args] | [key=value]"
+        });
+    }
+
+    let operation = parts[1].to_lowercase();
+    
+    // Parse key=value pairs
+    let mut params: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    if let Some(pipe_idx) = cmd.find('|') {
+        for part in cmd[pipe_idx + 1..].split('|') {
+            if let Some(eq_idx) = part.find('=') {
+                let key = part[..eq_idx].trim().to_string();
+                let value = part[eq_idx + 1..].trim().to_string();
+                params.insert(key, value);
+            }
+        }
+    }
+
+    match operation.as_str() {
+        "grant" => {
+            if parts.len() < 3 {
+                return json!({"type": "error", "message": "Usage: system grant <user_name>"});
+            }
+            match state.system.grant_full_access(parts[2].to_string()).await {
+                Ok(_) => json!({"type": "system.grant", "message": format!("Full access granted to {}", parts[2])}),
+                Err(e) => json!({"type": "error", "message": e}),
+            }
+        }
+        "revoke" => {
+            match state.system.revoke_access().await {
+                Ok(_) => json!({"type": "system.revoke", "message": "Access revoked"}),
+                Err(e) => json!({"type": "error", "message": e}),
+            }
+        }
+        "status" => {
+            let access = state.system.is_access_granted().await;
+            let self_mod = state.system.is_self_modification_enabled().await;
+            let tier1 = system_access::SystemAccessManager::is_tier1_enabled();
+            let tier2 = system_access::SystemAccessManager::is_tier2_enabled();
+            
+            let mut status_msg = format!(
+                "Access Status:\n- Tier 0 (Standard): Always Active\n- Tier 1 (File System): {} {}\n- Tier 2 (Unrestricted): {} {}\n- Security Gate Granted: {}\n- Self-Modification: {}",
+                if tier1 { "Enabled" } else { "Disabled" },
+                if tier1 { "(No security gate required)" } else { "" },
+                if tier2 { "Enabled" } else { "Disabled" },
+                if tier2 { "(No security gate required)" } else { "" },
+                access,
+                self_mod
+            );
+            
+            if tier1 {
+                status_msg.push_str("\n\n✅ Tier 1 Active: Full file system, process, service, registry, drive, app, and browser access enabled.");
+            }
+            
+            if tier2 {
+                status_msg.push_str("\n\n⚠️ WARNING: Tier 2 (Unrestricted Execution) is active. System-wide command execution is enabled.");
+            }
+            
+            json!({
+                "type": "system.status",
+                "message": status_msg,
+                "tier0": true,
+                "tier1_enabled": tier1,
+                "tier2_enabled": tier2,
+                "tier1_no_gate_required": tier1,
+                "tier2_no_gate_required": tier2,
+                "security_gate_granted": access,
+                "self_modification_enabled": self_mod,
+            })
+        }
+        "read" => {
+            if parts.len() < 3 {
+                return json!({"type": "error", "message": "Usage: system read <file_path>"});
+            }
+            match state.system.read_file(parts[2]).await {
+                Ok(content) => json!({
+                    "type": "system.read",
+                    "path": parts[2],
+                    "content": content,
+                }),
+                Err(e) => json!({"type": "error", "message": e}),
+            }
+        }
+        "write" => {
+            if parts.len() < 3 {
+                return json!({"type": "error", "message": "Usage: system write <file_path> | content=..."});
+            }
+            let content = params.get("content").cloned().unwrap_or_default();
+            match state.system.write_file(parts[2], &content).await {
+                Ok(_) => json!({"type": "system.write", "message": format!("File written: {}", parts[2])}),
+                Err(e) => json!({"type": "error", "message": e}),
+            }
+        }
+        "exec" | "execute" => {
+            if parts.len() < 3 {
+                return json!({"type": "error", "message": "Usage: system exec <command> | cwd=..."});
+            }
+            let command = parts[2..].join(" ");
+            let cwd = params.get("cwd").map(|s| s.as_str());
+            match state.system.exec_shell(&command, cwd).await {
+                Ok(CommandResult { exit_code, stdout, stderr }) => json!({
+                    "type": "system.exec",
+                    "exit_code": exit_code,
+                    "stdout": stdout,
+                    "stderr": stderr,
+                }),
+                Err(e) => json!({"type": "error", "message": e}),
+            }
+        }
+        _ => {
+            json!({
+                "type": "error",
+                "message": format!("Unknown system operation: {}. Supported: grant, revoke, status, read, write, exec", operation)
+            })
+        }
+    }
+}
+
+/// Handle code analysis commands (Tier 1 & Tier 2)
+async fn handle_code_command(state: &AppState, cmd: &str) -> serde_json::Value {
+    use code_analysis::MasterOrchestratorCodeAnalysis;
+    use std::path::Path;
+    
+    let parts: Vec<&str> = cmd.split_whitespace().collect();
+    if parts.len() < 3 {
+        return json!({
+            "type": "error",
+            "message": "Usage: code <operation> <file_path>\nOperations: analyze, semantic, intent, dependencies, codebase, quality, list"
+        });
+    }
+
+    let operation = parts[1].to_lowercase();
+    let file_path = parts[2];
+    
+    // Create code analyzer (Master Orchestrator has full access)
+    let analyzer = if let Some(llm) = state.llm.as_ref() {
+        MasterOrchestratorCodeAnalysis::new_with_llm((**llm).clone())
+    } else {
+        MasterOrchestratorCodeAnalysis::new()
+    };
+
+    match operation.as_str() {
+        "analyze" => {
+            match analyzer.analyze_file(Path::new(file_path)).await {
+                Ok(analysis) => json!({
+                    "type": "code.analyze",
+                    "file_path": file_path,
+                    "analysis": serde_json::to_value(&analysis).unwrap_or(json!(null)),
+                }),
+                Err(e) => json!({"type": "error", "message": e.to_string()}),
+            }
+        }
+        "semantic" => {
+            match analyzer.deep_semantic_analysis(Path::new(file_path)).await {
+                Ok(result) => json!({
+                    "type": "code.semantic",
+                    "file_path": file_path,
+                    "result": serde_json::to_value(&result).unwrap_or(json!(null)),
+                }),
+                Err(e) => json!({"type": "error", "message": e.to_string()}),
+            }
+        }
+        "intent" => {
+            match analyzer.analyze_intent(Path::new(file_path)).await {
+                Ok(result) => json!({
+                    "type": "code.intent",
+                    "file_path": file_path,
+                    "result": serde_json::to_value(&result).unwrap_or(json!(null)),
+                }),
+                Err(e) => json!({"type": "error", "message": e.to_string()}),
+            }
+        }
+        "dependencies" => {
+            match analyzer.analyze_dependencies(Path::new(file_path)).await {
+                Ok(result) => json!({
+                    "type": "code.dependencies",
+                    "file_path": file_path,
+                    "result": serde_json::to_value(&result).unwrap_or(json!(null)),
+                }),
+                Err(e) => json!({"type": "error", "message": e.to_string()}),
+            }
+        }
+        "codebase" => {
+            match analyzer.analyze_codebase(Path::new(file_path)).await {
+                Ok(result) => json!({
+                    "type": "code.codebase",
+                    "root_path": file_path,
+                    "result": serde_json::to_value(&result).unwrap_or(json!(null)),
+                }),
+                Err(e) => json!({"type": "error", "message": e.to_string()}),
+            }
+        }
+        "quality" => {
+            match analyzer.quality_metrics(Path::new(file_path)).await {
+                Ok(result) => json!({
+                    "type": "code.quality",
+                    "file_path": file_path,
+                    "result": serde_json::to_value(&result).unwrap_or(json!(null)),
+                }),
+                Err(e) => json!({"type": "error", "message": e.to_string()}),
+            }
+        }
+        "list" => {
+            match analyzer.list_definitions(Path::new(file_path)).await {
+                Ok(result) => json!({
+                    "type": "code.list",
+                    "file_path": file_path,
+                    "definitions": serde_json::to_value(&result).unwrap_or(json!(null)),
+                }),
+                Err(e) => json!({"type": "error", "message": e.to_string()}),
+            }
+        }
+        _ => {
+            json!({
+                "type": "error",
+                "message": format!("Unknown code operation: {}. Supported: analyze, semantic, intent, dependencies, codebase, quality, list", operation)
+            })
+        }
+    }
+}
+
+/// Handle Tier 2 unrestricted execution commands
+async fn handle_unrestricted_execution(state: &AppState, cmd: &str) -> serde_json::Value {
+    use cerebrum_nexus::{ToolAgent, ToolAgentConfig};
+    
+    // Check if Tier 2 is enabled
+    let unrestricted_enabled = std::env::var("MASTER_ORCHESTRATOR_UNRESTRICTED_EXECUTION")
+        .ok()
+        .map(|s| matches!(s.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .unwrap_or(false);
+
+    if !unrestricted_enabled {
+        return json!({
+            "type": "error",
+            "message": "Tier 2 unrestricted execution is not enabled. Set MASTER_ORCHESTRATOR_UNRESTRICTED_EXECUTION=true"
+        });
+    }
+
+    let parts: Vec<&str> = cmd.split_whitespace().collect();
+    if parts.len() < 2 {
+        return json!({
+            "type": "error",
+            "message": "Usage: exec <command> | cwd=..."
+        });
+    }
+
+    // Parse command and working directory
+    let command = parts[1..].join(" ");
+    let mut cwd: Option<String> = None;
+    
+    if let Some(pipe_idx) = cmd.find('|') {
+        for part in cmd[pipe_idx + 1..].split('|') {
+            if let Some(eq_idx) = part.find('=') {
+                let key = part[..eq_idx].trim();
+                let value = part[eq_idx + 1..].trim();
+                if key == "cwd" {
+                    cwd = Some(value.to_string());
+                }
+            }
+        }
+    }
+
+    // Use ToolAgent for unrestricted execution
+    let tool_config = ToolAgentConfig::from_env();
+    if let Some(llm) = state.llm.as_ref() {
+        // LLMOrchestrator implements LlmProvider trait
+        let tool_agent = ToolAgent::awaken(llm.clone(), tool_config);
+        match tool_agent.execute_unrestricted_command(&command, cwd.as_deref()).await {
+            Ok(output) => {
+                match output {
+                    cerebrum_nexus::ToolOutput::CommandOutput { output: result } => {
+                        json!({
+                            "type": "exec.result",
+                            "command": command,
+                            "output": result,
+                            "tier": "Tier 2 (Unrestricted Execution)",
+                        })
+                    }
+                    _ => json!({
+                        "type": "exec.result",
+                        "command": command,
+                        "output": format!("{:?}", output),
+                    }),
+                }
+            }
+            Err(e) => json!({
+                "type": "error",
+                "message": format!("Execution failed: {}", e),
+            }),
+        }
+    } else {
+        // Fallback: use system.exec_shell if LLM not available (still requires Tier 2)
+        match state.system.exec_shell(&command, cwd.as_deref()).await {
+            Ok(CommandResult { exit_code, stdout, stderr }) => json!({
+                "type": "exec.result",
+                "command": command,
+                "exit_code": exit_code,
+                "stdout": stdout,
+                "stderr": stderr,
+                "tier": "Tier 2 (Unrestricted Execution)",
+            }),
+            Err(e) => json!({
+                "type": "error",
+                "message": format!("Execution failed: {}", e),
+            }),
+        }
+    }
+}
+
 async fn command_to_response_json(state: &AppState, command: &str) -> serde_json::Value {
     let cmd = normalize_command(command);
     if cmd.is_empty() {
@@ -734,6 +1052,21 @@ async fn command_to_response_json(state: &AppState, command: &str) -> serde_json
             Ok(output) => json!({"type": "ecosystem.result", "message": output}),
             Err(e) => json!({"type": "error", "message": e.to_string()}),
         };
+    }
+
+    // System Access commands: system <operation> [args] | [key=value]
+    if lower.starts_with("system ") {
+        return handle_system_command(state, &cmd).await;
+    }
+
+    // Code Analysis commands: code <operation> <file_path>
+    if lower.starts_with("code ") {
+        return handle_code_command(state, &cmd).await;
+    }
+
+    // Tier 2 Unrestricted Execution: exec <command> | cwd=...
+    if lower.starts_with("exec ") || lower.starts_with("execute ") {
+        return handle_unrestricted_execution(state, &cmd).await;
     }
 
     // Built-in / fast-path commands for UI boot.

@@ -423,9 +423,15 @@ impl Partnership {
             response.push_str(&emotion_mirror_line(&e));
 
             // Phase 2: semantic recall — bring in a similar moment when Dad felt this way.
+            // Note: semantic_search_sync performs blocking I/O. If called from async context,
+            // use spawn_blocking to avoid deadlocking the async runtime.
             if let Some(kb) = VECTOR_KB.as_ref() {
                 let q = format!("similar moments when Dad felt {}", emotion_token(&e));
-                if let Ok(mut results) = kb.semantic_search_sync(&q, 1) {
+                // Use block_in_place to indicate blocking work to the async runtime
+                let results = tokio::task::block_in_place(|| {
+                    kb.semantic_search_sync(&q, 1)
+                });
+                if let Ok(mut results) = results {
                     if let Some(r) = results.pop() {
                         response.push_str("\n\n");
                         response.push_str(&format!(

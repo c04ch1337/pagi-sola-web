@@ -18,4 +18,5 @@ vital_organ_vaults = { path = "../../vital_organ_vaults" }
 intimate_girlfriend_module = { path = "../../intimate_girlfriend_module" }
 emotion_detection = { path = "../../emotion_detection" }
 vector_kb = { path = "../../vector_kb" }
+tokio = { version = "1", features = ["rt"] }
 
