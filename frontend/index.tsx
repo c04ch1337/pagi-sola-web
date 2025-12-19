@@ -1461,11 +1461,11 @@ const GoogleEcosystemView = () => {
   }
 
   return (
-    <div className="h-full flex flex-col bg-[#0f0b15] overflow-y-auto custom-scrollbar">
+    <div className="h-full flex flex-col bg-[#0f0b15]">
       <ComposeEmailModal isOpen={isComposeOpen} onClose={() => setIsComposeOpen(false)} onSend={handleSendEmail} />
 
       {/* Header */}
-      <div className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-void-800/80 backdrop-blur-md sticky top-0 z-30">
+      <div className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-void-800/80 backdrop-blur-md shrink-0">
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 rounded-xl bg-linear-to-br from-blue-500 to-green-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
             <Cloud size={24} className="text-white" />
@@ -1513,7 +1513,8 @@ const GoogleEcosystemView = () => {
       </div>
 
       {/* Main Content */}
-      <div className="p-8 max-w-7xl mx-auto w-full space-y-8">
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <div className="p-8 max-w-7xl mx-auto w-full space-y-8">
         
         {lastAction && (
           <div className="bg-void-900 border border-white/10 p-3 rounded-lg flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
@@ -1624,6 +1625,7 @@ const GoogleEcosystemView = () => {
             </button>
           </div>
         )}
+        </div>
       </div>
     </div>
   );
@@ -2113,7 +2115,7 @@ const MemoriesView = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-[#0f0b15] overflow-hidden">
+    <div className="h-full flex flex-col bg-[#0f0b15]">
       <ConfirmationModal
         isOpen={isDeleteModalOpen}
         onClose={() => {
@@ -2128,7 +2130,7 @@ const MemoriesView = () => {
       />
 
       {/* Header */}
-      <div className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-void-800/80 backdrop-blur-md sticky top-0 z-30">
+      <div className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-void-800/80 backdrop-blur-md shrink-0">
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 rounded-xl bg-linear-to-br from-phoenix-600 to-purple-600 flex items-center justify-center shadow-lg shadow-phoenix-600/20">
             <Brain size={22} className="text-white" />
@@ -2185,7 +2187,8 @@ const MemoriesView = () => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-8 max-w-7xl mx-auto w-full">
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <div className="p-8 max-w-7xl mx-auto w-full">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* Left: Search + List */}
           <div className="lg:col-span-3 space-y-4">
@@ -2402,6 +2405,7 @@ const MemoriesView = () => {
             </div>
           </div>
         </div>
+        </div>
       </div>
     </div>
   );
@@ -2506,7 +2510,7 @@ const ChatView = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
        <BackgroundEffects />
 
        {/* Chat Header */}
-       <div className="h-20 border-b border-white/5 flex items-center justify-between px-6 bg-void-800/80 backdrop-blur-md z-30 shadow-lg shadow-rose-900/5 relative">
+       <div className="h-20 border-b border-white/5 flex items-center justify-between px-6 bg-void-800/80 backdrop-blur-md z-30 shadow-lg shadow-rose-900/5 shrink-0">
           <div className="flex items-center gap-4">
              {/* Personalized Avatar */}
              <div className="relative group cursor-pointer">
@@ -3373,9 +3377,9 @@ const EcoSystemView = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-[#0f0b15] overflow-y-auto custom-scrollbar">
+    <div className="h-full flex flex-col bg-[#0f0b15]">
       {/* Header */}
-      <div className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-void-800/80 backdrop-blur-md sticky top-0 z-30">
+      <div className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-void-800/80 backdrop-blur-md shrink-0" style={{paddingTop: `max(env(safe-area-inset-top, 0px), 0px)`}}>
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 rounded-xl bg-linear-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
             <GitBranch size={24} className="text-white" />
@@ -3397,8 +3401,10 @@ const EcoSystemView = () => {
         </button>
       </div>
 
-      {/* Import Form */}
-      <div className="p-8 border-b border-white/5">
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
+        {/* Import Form */}
+        <div className="p-8 border-b border-white/5">
         <div className="max-w-4xl mx-auto">
           <h3 className="text-lg font-bold text-white mb-4">Import GitHub Repository</h3>
           <div className="flex gap-3">
@@ -3535,6 +3541,7 @@ const EcoSystemView = () => {
             ))}
           </div>
         )}
+        </div>
       </div>
     </div>
   );
@@ -3597,7 +3604,7 @@ const DashboardLayout = () => {
           <div className="w-6" />
         </div>
 
-        <div className="flex-1 overflow-hidden relative bg-gradient-to-b from-[#0f0b15] to-[#130f1c]">
+        <div className="flex-1 h-full overflow-hidden relative bg-gradient-to-b from-[#0f0b15] to-[#130f1c]">
           {/* Chat View */}
           {activeView === 'chat' && <ChatView onOpenSettings={() => handleNavigation('settings')} />}
           
@@ -3704,7 +3711,7 @@ const DashboardLayout = () => {
                        <div className="text-sm text-white font-medium flex items-center gap-2">
                          <MousePointer2 size={16} className="text-phoenix-400" /> Mouse Jigger
                        </div>
-                       <div className="text-xs text-gray-500">Not implemented in the UI. Intended for a host service to prevent idle sleep.</div>
+                       <div className="text-xs text-gray-500">Prevents system idle sleep by simulating mouse movement. Controlled via backend host service.</div>
                      </div>
                      <button
                        onClick={() => {
