@@ -303,6 +303,7 @@ pub struct SystemAccessManager {
     always_on_task: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
     keylogger_enabled: Arc<StdMutex<bool>>,
     mouse_jigger_enabled: Arc<StdMutex<bool>>,
+    mouse_jigger_task: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
 }
 
 impl SystemAccessManager {
@@ -322,6 +323,7 @@ impl SystemAccessManager {
             always_on_task: Arc::new(Mutex::new(None)),
             keylogger_enabled: Arc::new(StdMutex::new(false)),
             mouse_jigger_enabled: Arc::new(StdMutex::new(false)),
+            mouse_jigger_task: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -553,15 +555,87 @@ impl SystemAccessManager {
 
     pub async fn set_mouse_jigger_enabled(&self, enabled: bool) -> Result<(), String> {
         self.security_gate.lock().await.check_access()?;
+        
+        // Stop existing task if disabling or restarting
+        {
+            let mut task = self.mouse_jigger_task.lock().await;
+            if let Some(handle) = task.take() {
+                handle.abort();
+            }
+        }
+        
         let mut mouse_jigger_enabled = self.mouse_jigger_enabled.lock().unwrap();
         *mouse_jigger_enabled = enabled;
+        
         if enabled {
-            // In a real implementation, we would spawn a thread or task
-            // to move the mouse cursor periodically.
-            println!("Mouse jigger enabled.");
+            // Spawn background task to move mouse periodically
+            let enabled_flag = self.mouse_jigger_enabled.clone();
+            let task_handle = tokio::spawn(async move {
+                let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(60)); // Move every 60 seconds
+                interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                
+                loop {
+                    interval.tick().await;
+                    
+                    // Check if still enabled
+                    let enabled = {
+                        let flag = enabled_flag.lock().unwrap();
+                        *flag
+                    };
+                    
+                    if !enabled {
+                        break;
+                    }
+                    
+                    // Move mouse cursor slightly (1 pixel relative movement)
+                    #[cfg(windows)]
+                    {
+                        use winsafe::{self as w, co};
+                        
+                        // Move mouse 1 pixel to the right, then back
+                        // This is imperceptible but prevents idle sleep
+                        let inputs = [
+                            w::HwKbMouse::Mouse(w::MOUSEINPUT {
+                                dx: 1,  // Move 1 pixel right
+                                dy: 0,  // No vertical movement
+                                mouseData: 0,
+                                dwFlags: co::MOUSEEVENTF::MOVE,
+                                time: 0,
+                                dwExtraInfo: 0,
+                            }),
+                            w::HwKbMouse::Mouse(w::MOUSEINPUT {
+                                dx: -1, // Move 1 pixel back
+                                dy: 0,  // No vertical movement
+                                mouseData: 0,
+                                dwFlags: co::MOUSEEVENTF::MOVE,
+                                time: 0,
+                                dwExtraInfo: 0,
+                            }),
+                        ];
+                        
+                        if let Err(e) = w::SendInput(&inputs) {
+                            eprintln!("Failed to move mouse: {}", e);
+                        }
+                    }
+                    
+                    #[cfg(not(windows))]
+                    {
+                        // For non-Windows, we could use xdotool or similar
+                        // For now, just log
+                        println!("Mouse jigger: would move mouse (non-Windows platform)");
+                    }
+                }
+            });
+            
+            // Store the task handle
+            let mut task = self.mouse_jigger_task.lock().await;
+            *task = Some(task_handle);
+            
+            println!("Mouse jigger enabled - will move cursor every 60 seconds.");
         } else {
             println!("Mouse jigger disabled.");
         }
+        
         Ok(())
     }
 }

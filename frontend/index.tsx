@@ -1465,7 +1465,7 @@ const GoogleEcosystemView = () => {
       <ComposeEmailModal isOpen={isComposeOpen} onClose={() => setIsComposeOpen(false)} onSend={handleSendEmail} />
 
       {/* Header */}
-      <div className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-void-800/80 backdrop-blur-md shrink-0">
+      <div className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-void-800/80 backdrop-blur-md shrink-0" style={{paddingTop: `max(env(safe-area-inset-top, 0px), 0px)`, minHeight: `calc(5rem + max(env(safe-area-inset-top, 0px), 0px))`}}>
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 rounded-xl bg-linear-to-br from-blue-500 to-green-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
             <Cloud size={24} className="text-white" />
@@ -2130,7 +2130,7 @@ const MemoriesView = () => {
       />
 
       {/* Header */}
-      <div className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-void-800/80 backdrop-blur-md shrink-0">
+      <div className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-void-800/80 backdrop-blur-md shrink-0" style={{paddingTop: `max(env(safe-area-inset-top, 0px), 0px)`, minHeight: `calc(5rem + max(env(safe-area-inset-top, 0px), 0px))`}}>
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 rounded-xl bg-linear-to-br from-phoenix-600 to-purple-600 flex items-center justify-center shadow-lg shadow-phoenix-600/20">
             <Brain size={22} className="text-white" />
@@ -2510,7 +2510,7 @@ const ChatView = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
        <BackgroundEffects />
 
        {/* Chat Header */}
-       <div className="h-20 border-b border-white/5 flex items-center justify-between px-6 bg-void-800/80 backdrop-blur-md z-30 shadow-lg shadow-rose-900/5 shrink-0">
+       <div className="h-20 border-b border-white/5 flex items-center justify-between px-6 bg-void-800/80 backdrop-blur-md z-30 shadow-lg shadow-rose-900/5 shrink-0" style={{paddingTop: `max(env(safe-area-inset-top, 0px), 0px)`, minHeight: `calc(5rem + max(env(safe-area-inset-top, 0px), 0px))`}}>
           <div className="flex items-center gap-4">
              {/* Personalized Avatar */}
              <div className="relative group cursor-pointer">
@@ -2757,35 +2757,134 @@ const ChatView = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
 // --- Archetype Matcher & Results ---
 
 const MatchResultView = ({ matches, onApply, onRestart, profile }: { matches: Archetype[], onApply: (id: string) => void, onRestart: () => void, profile: DatingProfile }) => {
-  const topMatch = matches[0];
-  const compatibility = topMatch.matchScore || 0;
+  const [selectedMatch, setSelectedMatch] = useState<Archetype | null>(null);
+  const [isApplying, setIsApplying] = useState(false);
+  const [applySuccess, setApplySuccess] = useState(false);
+  
+  // Get top 3 matches (or fewer if not available)
+  const topMatches = matches.slice(0, 3);
+  const topMatch = topMatches[0];
+
+  const handleApply = async (match: Archetype) => {
+    setSelectedMatch(match);
+    setIsApplying(true);
+    try {
+      await onApply(match.id);
+      setApplySuccess(true);
+    } catch (e) {
+      console.error('Failed to apply archetype:', e);
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
+  // Show success state after applying
+  if (applySuccess && selectedMatch) {
+    return (
+      <div className="animate-in fade-in zoom-in-95 duration-700 h-full flex flex-col items-center justify-center p-6 relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-full bg-linear-to-br from-phoenix-900/20 via-void-900 to-void-900 -z-10" />
+        <div className="text-center mb-8">
+          <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-linear-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-[0_0_30px_rgba(34,197,94,0.4)]">
+            <CheckCircle2 size={48} className="text-white" />
+          </div>
+          <h2 className="text-4xl font-bold mb-2 text-white drop-shadow-lg">Archetype Applied!</h2>
+          <p className="text-green-400 font-medium tracking-wide text-lg mb-2">{selectedMatch.name} ({selectedMatch.sign})</p>
+          <p className="text-gray-400 text-sm max-w-md mx-auto">
+            Sola's personality has been updated to match your preferences. Start chatting to experience the new connection!
+          </p>
+        </div>
+        <button
+          onClick={onRestart}
+          className="mt-4 px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-medium transition-all"
+        >
+          Choose Different Archetype
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="animate-in fade-in zoom-in-95 duration-700 h-full flex flex-col items-center justify-center p-6 relative overflow-hidden">
+    <div className="animate-in fade-in zoom-in-95 duration-700 h-full flex flex-col items-center justify-start p-6 relative overflow-y-auto custom-scrollbar">
       <div className="absolute top-0 left-0 w-full h-full bg-linear-to-br from-phoenix-900/20 via-void-900 to-void-900 -z-10" />
-      <div className="text-center mb-8">
-        <h2 className="text-4xl font-bold mb-2 text-white drop-shadow-lg">It's a Match!</h2>
-        <p className="text-phoenix-300 font-medium tracking-wide uppercase text-sm">Compatibility: {compatibility}%</p>
+      
+      <div className="text-center mb-8 pt-4">
+        <h2 className="text-4xl font-bold mb-2 text-white drop-shadow-lg">Your Top Matches!</h2>
+        <p className="text-phoenix-300 font-medium tracking-wide text-sm">Choose the archetype that resonates with you</p>
       </div>
 
-      <div className="relative group max-w-sm w-full perspective-1000">
-        <div className={`relative bg-linear-to-br ${topMatch.avatarGradient} p-1 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)] transform transition-transform duration-500 hover:scale-105`}>
-          <div className="bg-void-900/90 backdrop-blur-xl rounded-[22px] p-8 text-center border border-white/10 relative overflow-hidden">
-            <h3 className="text-2xl font-bold text-white mb-1">{topMatch.name}</h3>
-            <p className="text-sm text-phoenix-400 font-medium uppercase tracking-widest mb-4">{topMatch.sign}</p>
-            <p className="text-sm text-gray-300 leading-relaxed mb-6 border-t border-white/10 pt-4">
-              "{topMatch.tagline}"
-            </p>
-            <button 
-              onClick={() => onApply(topMatch.id)}
-              className="w-full bg-linear-to-r from-phoenix-600 to-purple-600 hover:from-phoenix-500 hover:to-purple-500 text-white font-bold py-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+      {/* Top 3 Matches Grid */}
+      <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        {topMatches.map((match, index) => {
+          const isTop = index === 0;
+          const compatibility = match.matchScore || 0;
+          const gradientClass = match.avatarGradient || (ARCHETYPES_DB.find(a => a.id === match.id)?.avatarGradient) || 'from-phoenix-500 to-purple-600';
+          
+          return (
+            <div
+              key={match.id}
+              className={`relative group perspective-1000 ${isTop ? 'md:scale-105 z-10' : ''}`}
             >
-              <Heart className="fill-white" size={20} /> Start Relationship
-            </button>
-          </div>
-        </div>
+              {/* Rank Badge */}
+              <div className={`absolute -top-3 -left-3 z-20 w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg shadow-lg ${
+                index === 0 ? 'bg-yellow-500 text-yellow-900' :
+                index === 1 ? 'bg-gray-300 text-gray-700' :
+                'bg-amber-700 text-amber-100'
+              }`}>
+                #{index + 1}
+              </div>
+              
+              {/* Match Card */}
+              <div className={`relative bg-linear-to-br ${gradientClass} p-1 rounded-3xl shadow-[0_0_30px_rgba(0,0,0,0.3)] transform transition-all duration-500 hover:scale-105 ${
+                selectedMatch?.id === match.id ? 'ring-4 ring-phoenix-500 ring-offset-4 ring-offset-void-900' : ''
+              } ${isTop ? 'shadow-[0_0_50px_rgba(236,72,153,0.3)]' : ''}`}>
+                <div className="bg-void-900/90 backdrop-blur-xl rounded-[22px] p-6 text-center border border-white/10 relative overflow-hidden">
+                  {/* Compatibility Score */}
+                  <div className="absolute top-4 right-4 px-3 py-1 bg-white/10 rounded-full">
+                    <span className="text-sm font-bold text-phoenix-300">{compatibility}%</span>
+                  </div>
+                  
+                  <h3 className="text-xl font-bold text-white mb-1 mt-2">{match.name}</h3>
+                  <p className="text-sm text-phoenix-400 font-medium uppercase tracking-widest mb-3">{match.sign}</p>
+                  
+                  {/* Style Bias Tag */}
+                  <div className="inline-block px-3 py-1 bg-white/5 rounded-full text-xs text-gray-400 mb-4">
+                    {match.styleBias} Style
+                  </div>
+                  
+                  <p className="text-sm text-gray-300 leading-relaxed mb-6 border-t border-white/10 pt-4 min-h-[60px]">
+                    "{match.tagline || match.description?.slice(0, 80) + '...'}"
+                  </p>
+                  
+                  <button
+                    onClick={() => handleApply(match)}
+                    disabled={isApplying}
+                    className={`w-full font-bold py-3 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 ${
+                      isApplying && selectedMatch?.id === match.id
+                        ? 'bg-gray-600 cursor-wait'
+                        : isTop
+                          ? 'bg-linear-to-r from-phoenix-600 to-purple-600 hover:from-phoenix-500 hover:to-purple-500 text-white'
+                          : 'bg-white/10 hover:bg-white/20 text-white'
+                    }`}
+                  >
+                    {isApplying && selectedMatch?.id === match.id ? (
+                      <>
+                        <RefreshCw size={18} className="animate-spin" /> Applying...
+                      </>
+                    ) : (
+                      <>
+                        <Heart className={isTop ? 'fill-white' : ''} size={18} />
+                        {isTop ? 'Best Match!' : 'Select'}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
-      <button onClick={onRestart} className="mt-8 text-sm text-gray-500 hover:text-gray-300 underline underline-offset-4">
+
+      <button onClick={onRestart} className="mt-4 text-sm text-gray-500 hover:text-gray-300 underline underline-offset-4">
         Start Over
       </button>
     </div>
@@ -3115,7 +3214,7 @@ const OrchestratorView = () => {
   if (selectedAgent) {
     return (
       <div className="flex flex-col h-full bg-[#0f0b15]">
-        <div className="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-void-800/50 backdrop-blur-md">
+        <div className="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-void-800/50 backdrop-blur-md" style={{paddingTop: `max(env(safe-area-inset-top, 0px), 0px)`, minHeight: `calc(4rem + max(env(safe-area-inset-top, 0px), 0px))`}}>
           <div className="flex items-center gap-4">
              <button onClick={() => setSelectedAgentId(null)} className="text-gray-400 hover:text-white transition-colors">
                <ChevronRight size={20} className="rotate-180" />
@@ -3379,7 +3478,7 @@ const EcoSystemView = () => {
   return (
     <div className="h-full flex flex-col bg-[#0f0b15]">
       {/* Header */}
-      <div className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-void-800/80 backdrop-blur-md shrink-0" style={{paddingTop: `max(env(safe-area-inset-top, 0px), 0px)`}}>
+      <div className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-void-800/80 backdrop-blur-md shrink-0" style={{paddingTop: `max(env(safe-area-inset-top, 0px), 0px)`, minHeight: `calc(5rem + max(env(safe-area-inset-top, 0px), 0px))`}}>
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 rounded-xl bg-linear-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
             <GitBranch size={24} className="text-white" />
@@ -3598,7 +3697,7 @@ const DashboardLayout = () => {
       </div>
 
       <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-        <div className="lg:hidden h-16 flex items-center px-4 border-b border-white/5 justify-between">
+        <div className="lg:hidden h-16 flex items-center px-4 border-b border-white/5 justify-between" style={{paddingTop: `max(env(safe-area-inset-top, 0px), 0px)`, minHeight: `calc(4rem + max(env(safe-area-inset-top, 0px), 0px))`}}>
           <button onClick={() => setIsMobileMenuOpen(true)} className="text-gray-300"><Menu size={24} /></button>
           <span className="font-semibold text-gray-200 capitalize">{activeView}</span>
           <div className="w-6" />

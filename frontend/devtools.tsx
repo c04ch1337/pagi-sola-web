@@ -31,6 +31,30 @@ export const DevToolsView: React.FC = () => {
   const [writeErr, setWriteErr] = useState<string | null>(null);
   const [writeOk, setWriteOk] = useState<boolean>(false);
 
+  // Sola Upgrade state
+  const [upgradeStatus, setUpgradeStatus] = useState<{
+    current_version: string;
+    latest_version?: string;
+    has_updates: boolean;
+    last_check?: string;
+    upgrade_in_progress: boolean;
+    repo_url: string;
+  } | null>(null);
+  const [upgradeCheck, setUpgradeCheck] = useState<{
+    has_updates: boolean;
+    current_commit: string;
+    latest_commit?: string;
+    behind_by?: number;
+    message: string;
+  } | null>(null);
+  const [upgradeResult, setUpgradeResult] = useState<{
+    status: string;
+    message: string;
+    steps?: string[];
+    errors?: string[];
+    needs_restart?: boolean;
+  } | null>(null);
+
   const statusText = useMemo(() => {
     if (!status) return 'Unknown';
     const a = status.full_access_granted ? 'FULL_ACCESS' : 'NO_ACCESS';
@@ -53,7 +77,112 @@ export const DevToolsView: React.FC = () => {
 
   useEffect(() => {
     refreshStatus();
+    refreshUpgradeStatus();
   }, []);
+
+  const refreshUpgradeStatus = async () => {
+    try {
+      const res = await fetch(apiUrl('/api/sola/upgrade/status'));
+      if (res.ok) {
+        const data = await res.json();
+        setUpgradeStatus(data);
+      }
+    } catch (e) {
+      // Silently fail if endpoint doesn't exist yet
+    }
+  };
+
+  const checkForUpdates = async () => {
+    setLoading('upgrade-check');
+    setUpgradeResult(null);
+    try {
+      const res = await fetch(apiUrl('/api/sola/upgrade/check'));
+      const j = await res.json();
+      if (!res.ok) {
+        setUpgradeResult({
+          status: 'error',
+          message: j?.error || `Check failed (${res.status})`,
+        });
+        return;
+      }
+      setUpgradeCheck(j);
+      await refreshUpgradeStatus();
+    } catch (e: any) {
+      setUpgradeResult({
+        status: 'error',
+        message: e?.message || String(e),
+      });
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const pullUpdates = async () => {
+    setLoading('upgrade-pull');
+    setUpgradeResult(null);
+    try {
+      const res = await fetch(apiUrl('/api/sola/upgrade/pull'), {
+        method: 'POST',
+      });
+      const j = await res.json();
+      if (!res.ok) {
+        setUpgradeResult({
+          status: 'error',
+          message: j?.error || `Pull failed (${res.status})`,
+        });
+        return;
+      }
+      setUpgradeResult({
+        status: j.status,
+        message: j.message,
+      });
+      await refreshUpgradeStatus();
+    } catch (e: any) {
+      setUpgradeResult({
+        status: 'error',
+        message: e?.message || String(e),
+      });
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const applyUpgrade = async () => {
+    if (!confirm('This will pull latest changes and rebuild Sola. Continue?')) {
+      return;
+    }
+    setLoading('upgrade-apply');
+    setUpgradeResult(null);
+    try {
+      const res = await fetch(apiUrl('/api/sola/upgrade/apply'), {
+        method: 'POST',
+      });
+      const j = await res.json();
+      if (!res.ok) {
+        setUpgradeResult({
+          status: 'error',
+          message: j?.error || `Upgrade failed (${res.status})`,
+          errors: j?.errors,
+        });
+        return;
+      }
+      setUpgradeResult({
+        status: j.status,
+        message: j.message,
+        steps: j.steps,
+        errors: j.errors,
+        needs_restart: j.needs_restart,
+      });
+      await refreshUpgradeStatus();
+    } catch (e: any) {
+      setUpgradeResult({
+        status: 'error',
+        message: e?.message || String(e),
+      });
+    } finally {
+      setLoading(null);
+    }
+  };
 
   const runExec = async () => {
     setLoading('exec');
@@ -153,6 +282,139 @@ export const DevToolsView: React.FC = () => {
             </div>
             <div className="text-xs text-gray-500">Local-only (binds to <span className="font-mono">127.0.0.1</span>)</div>
           </div>
+        </div>
+
+        {/* Sola Self-Improvement / Upgrade Section */}
+        <div className="glass-panel p-6 rounded-2xl border border-white/10">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-white font-bold text-lg">Sola Self-Improvement</h3>
+              <p className="text-gray-400 text-xs mt-1">Update and upgrade Sola from the pagi-sola-web repository</p>
+            </div>
+            <button
+              onClick={refreshUpgradeStatus}
+              className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-gray-200 rounded-lg border border-white/10 text-xs"
+              disabled={loading === 'upgrade-status'}
+            >
+              {loading === 'upgrade-status' ? 'Refreshing…' : 'Refresh'}
+            </button>
+          </div>
+
+          {upgradeStatus && (
+            <div className="mb-4 p-4 bg-black/40 border border-white/10 rounded-lg">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <div className="text-gray-500 text-xs">Current Version</div>
+                  <div className="text-white font-mono">{upgradeStatus.current_version || 'Unknown'}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500 text-xs">Repository</div>
+                  <div className="text-white text-xs truncate" title={upgradeStatus.repo_url}>
+                    {upgradeStatus.repo_url.replace('https://github.com/', '').replace('.git', '')}
+                  </div>
+                </div>
+                {upgradeStatus.last_check && (
+                  <div>
+                    <div className="text-gray-500 text-xs">Last Check</div>
+                    <div className="text-white text-xs">
+                      {new Date(parseInt(upgradeStatus.last_check) * 1000).toLocaleString()}
+                    </div>
+                  </div>
+                )}
+                {upgradeCheck && (
+                  <div>
+                    <div className="text-gray-500 text-xs">Status</div>
+                    <div className={`text-xs font-semibold ${upgradeCheck.has_updates ? 'text-yellow-400' : 'text-green-400'}`}>
+                      {upgradeCheck.has_updates ? `${upgradeCheck.behind_by || 0} commits behind` : 'Up to date'}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={checkForUpdates}
+              className="px-4 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-600/40 rounded-lg font-semibold text-sm"
+              disabled={loading === 'upgrade-check' || !status?.self_modification_enabled}
+            >
+              {loading === 'upgrade-check' ? 'Checking…' : 'Check for Updates'}
+            </button>
+            <button
+              onClick={pullUpdates}
+              className="px-4 py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-600/40 rounded-lg font-semibold text-sm"
+              disabled={loading === 'upgrade-pull' || !status?.self_modification_enabled || !upgradeCheck?.has_updates}
+            >
+              {loading === 'upgrade-pull' ? 'Pulling…' : 'Pull Updates'}
+            </button>
+            <button
+              onClick={applyUpgrade}
+              className="px-4 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-300 border border-green-600/40 rounded-lg font-semibold text-sm"
+              disabled={loading === 'upgrade-apply' || !status?.self_modification_enabled}
+            >
+              {loading === 'upgrade-apply' ? 'Applying…' : 'Apply Upgrade & Rebuild'}
+            </button>
+          </div>
+
+          {!status?.self_modification_enabled && (
+            <div className="mt-3 p-3 bg-yellow-600/10 border border-yellow-600/30 rounded-lg">
+              <div className="text-yellow-400 text-xs">
+                ⚠️ Self-modification must be enabled to use Sola upgrade features
+              </div>
+            </div>
+          )}
+
+          {upgradeCheck && (
+            <div className="mt-4 p-3 bg-black/40 border border-white/10 rounded-lg">
+              <div className="text-xs text-gray-400 mb-1">Check Result:</div>
+              <div className="text-white text-sm">{upgradeCheck.message}</div>
+              {upgradeCheck.latest_commit && (
+                <div className="text-gray-400 text-xs mt-2 font-mono">
+                  Latest: {upgradeCheck.latest_commit}
+                </div>
+              )}
+            </div>
+          )}
+
+          {upgradeResult && (
+            <div className={`mt-4 p-4 rounded-lg border ${
+              upgradeResult.status === 'success' 
+                ? 'bg-green-600/10 border-green-600/30' 
+                : upgradeResult.status === 'error'
+                ? 'bg-red-600/10 border-red-600/30'
+                : 'bg-yellow-600/10 border-yellow-600/30'
+            }`}>
+              <div className={`text-sm font-semibold mb-2 ${
+                upgradeResult.status === 'success' 
+                  ? 'text-green-400' 
+                  : upgradeResult.status === 'error'
+                  ? 'text-red-400'
+                  : 'text-yellow-400'
+              }`}>
+                {upgradeResult.status === 'success' ? '✓' : upgradeResult.status === 'error' ? '✗' : '⚠'} {upgradeResult.message}
+              </div>
+              {upgradeResult.steps && upgradeResult.steps.length > 0 && (
+                <div className="text-xs text-gray-300 space-y-1">
+                  {upgradeResult.steps.map((step, i) => (
+                    <div key={i}>• {step}</div>
+                  ))}
+                </div>
+              )}
+              {upgradeResult.errors && upgradeResult.errors.length > 0 && (
+                <div className="text-xs text-red-400 space-y-1 mt-2">
+                  {upgradeResult.errors.map((error, i) => (
+                    <div key={i}>✗ {error}</div>
+                  ))}
+                </div>
+              )}
+              {upgradeResult.needs_restart && (
+                <div className="mt-3 p-2 bg-blue-600/20 border border-blue-600/30 rounded text-xs text-blue-300">
+                  🔄 Restart required to apply changes
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

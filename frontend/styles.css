@@ -19,7 +19,16 @@ body,
 
 body {
   margin: 0;
+  /* Removed padding-top - safe-area is handled per-header to prevent cutoff issues */
+}
+
+/* Safe area utilities for headers */
+.pt-safe {
   padding-top: env(safe-area-inset-top, 0px);
+}
+
+.mt-safe {
+  margin-top: env(safe-area-inset-top, 0px);
 }
 
 body {

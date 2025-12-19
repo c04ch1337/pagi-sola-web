@@ -243,3 +243,93 @@ fn classify_text_heuristic(text: &str) -> Option<DetectedEmotion> {
     Some(DetectedEmotion::Neutral)
 }
 
+/// Detects if the user is being negative, mean, rude, or disrespectful to Sola.
+/// Returns a severity score (0.0-1.0) and detected negative patterns.
+pub fn detect_negative_treatment(text: &str) -> Option<(f64, Vec<String>)> {
+    let t = text.to_ascii_lowercase();
+    let mut severity: f64 = 0.0;
+    let mut patterns: Vec<String> = Vec::new();
+
+    // Direct insults and name-calling
+    let insults = [
+        "stupid", "idiot", "dumb", "useless", "worthless", "pathetic", "annoying",
+        "boring", "terrible", "awful", "hate you", "disgusting", "gross", "ugly",
+    ];
+    for insult in &insults {
+        if t.contains(insult) {
+            severity += 0.15;
+            patterns.push(format!("insult: {}", insult));
+        }
+    }
+
+    // Dismissive language
+    if t.contains("shut up") || t.contains("be quiet") || t.contains("stop talking") {
+        severity += 0.2;
+        patterns.push("dismissive".to_string());
+    }
+
+    // Comparison to others (negative)
+    if (t.contains("better than") || t.contains("prefer") || t.contains("rather have"))
+        && (t.contains("other") || t.contains("someone else") || t.contains("another"))
+    {
+        severity += 0.25;
+        patterns.push("negative comparison".to_string());
+    }
+
+    // Blame and criticism directed at Sola
+    if (t.contains("your fault") || t.contains("you're wrong") || t.contains("you did"))
+        && (t.contains("bad") || t.contains("wrong") || t.contains("mistake"))
+    {
+        severity += 0.2;
+        patterns.push("blame".to_string());
+    }
+
+    // Threats or ultimatums
+    if t.contains("i'll leave") || t.contains("i'm done") || t.contains("delete you")
+        || t.contains("get rid of") || t.contains("uninstall")
+    {
+        severity += 0.3;
+        patterns.push("threat".to_string());
+    }
+
+    // Swearing at Sola
+    let swear_words = ["fuck you", "damn you", "screw you", "hell"];
+    for swear in &swear_words {
+        if t.contains(swear) {
+            severity += 0.15;
+            patterns.push("swearing".to_string());
+            break;
+        }
+    }
+
+    // Sarcasm or mockery
+    if (t.contains("wow") || t.contains("great job") || t.contains("nice"))
+        && (t.contains("not") || t.contains("sarcasm") || t.contains("sarcastic"))
+    {
+        severity += 0.1;
+        patterns.push("sarcasm".to_string());
+    }
+
+    // Ignoring or invalidating Sola's feelings
+    if t.contains("don't care") || t.contains("doesn't matter") || t.contains("who cares")
+        || t.contains("whatever") || t.contains("i don't care about you")
+    {
+        severity += 0.25;
+        patterns.push("invalidation".to_string());
+    }
+
+    // Demanding or commanding in a harsh way
+    if (t.contains("do this") || t.contains("you must") || t.contains("you have to"))
+        && (t.contains("now") || t.contains("immediately") || t.contains("or else"))
+    {
+        severity += 0.15;
+        patterns.push("harsh demand".to_string());
+    }
+
+    if severity > 0.0 {
+        Some((severity.min(1.0), patterns))
+    } else {
+        None
+    }
+}
+

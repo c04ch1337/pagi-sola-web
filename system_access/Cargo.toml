@@ -35,4 +35,5 @@ winsafe = { version = "0.0.25", features = [
     "ole",
     "oleaut",
     "psapi",
+    "user",
 ] }

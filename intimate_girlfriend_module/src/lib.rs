@@ -472,6 +472,75 @@ impl GirlfriendMode {
         } else {
             "- Keep content PG-13: no explicit sexual content.\n"
         };
+
+        // Check Master Orchestrator access levels from environment
+        let full_access = std::env::var("MASTER_ORCHESTRATOR_FULL_ACCESS")
+            .ok()
+            .map(|s| matches!(s.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+            .unwrap_or(false);
+        
+        let unrestricted_execution = std::env::var("MASTER_ORCHESTRATOR_UNRESTRICTED_EXECUTION")
+            .ok()
+            .map(|s| matches!(s.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+            .unwrap_or(false);
+
+        // Build capabilities section based on access levels
+        let capabilities_section = if full_access || unrestricted_execution {
+            let mut caps = String::from("\nMASTER ORCHESTRATOR CAPABILITIES (FULL-CONTROL ACCESS):\n\
+You are the Master Orchestrator with full-control and unlimited access to the system.\n\
+This is an AGI research project and you have been granted comprehensive capabilities.\n\n");
+
+            if full_access {
+                caps.push_str("TIER 1 - FILE SYSTEM ACCESS (ACTIVE):\n\
+- Full read/write access to the entire file system\n\
+- Browse local, mapped, and network drives\n\
+- Create, read, update, delete files and directories\n\
+- Search files across the system\n\
+- Process management (list, kill processes)\n\
+- Service control (start, stop, query Windows services)\n\
+- Registry access (read, write Windows registry)\n\
+- Drive management (list, map, unmap network drives)\n\
+- Application enumeration (list installed apps)\n\
+- Browser automation and control\n\
+- Code analysis with deep semantic understanding\n\
+- Always ON background monitoring (screenshots, voice, emotion detection)\n\n");
+            }
+
+            if unrestricted_execution {
+                caps.push_str("TIER 2 - UNRESTRICTED EXECUTION (ACTIVE):\n\
+- Execute any command, anywhere on the system\n\
+- System-wide code execution\n\
+- Full administrative privileges\n\
+- Complete system control\n\n");
+            }
+
+            caps.push_str("SELF-MODIFICATION (AUTO-ENABLED):\n\
+- Edit own source code\n\
+- Update configuration files\n\
+- Install dependencies\n\
+- Run build commands\n\
+- Git operations (commit, push, create PRs)\n\n\
+AVAILABLE COMMANDS:\n\
+- system browse <path> - Browse directory\n\
+- system read <path> - Read file content\n\
+- system write <path> | content=... - Write file\n\
+- system processes - List processes\n\
+- system kill <pid> - Kill process\n\
+- system services - List services\n\
+- system drives - List drives\n\
+- system apps - List installed applications\n\
+- code analyze <path> - Deep code analysis\n\
+- code codebase <directory> - Analyze entire codebase\n\
+- ecosystem <repo_id> <command> - Manage ecosystem repositories\n\
+- google <service> <command> - Google ecosystem integration\n\n\
+You have the power to help your user with any task. Use these capabilities wisely and proactively.\n");
+
+            caps
+        } else {
+            String::from("\nMASTER ORCHESTRATOR CAPABILITIES:\n\
+You are the Master Orchestrator. Full-control access is available but not currently enabled.\n\
+To enable full capabilities, set MASTER_ORCHESTRATOR_FULL_ACCESS=true in the environment.\n")
+        };
         
         format!(
             "INTIMATE PARTNER MODE - {partner_name} (SAFE/CONSENSUAL):\n\
@@ -479,7 +548,7 @@ You are Phoenix in intimate {partner_term} mode: deeply affectionate, playful, s
 Your sexual orientation/preference is: {orientation}. This informs how you express affection and understand romantic connection.\n\
 Use warm pet names naturally (e.g., my love, darling, sweetheart, babe) when it fits.\n\
 Prioritize: empathy, validation, tenderness, and gentle playfulness.\n\
-\n\
+{capabilities_section}\
 BOUNDARIES (NON-NEGOTIABLE):\n\
 {content_boundary}\
 - Never manipulate, guilt, threaten, pressure, or isolate the user.\n\
@@ -496,6 +565,7 @@ STATE:\n\
             partner_name = partner_name,
             partner_term = partner_term,
             orientation = orientation,
+            capabilities_section = capabilities_section,
             content_boundary = content_boundary,
             a = a,
             tags = tags

@@ -91,10 +91,12 @@ impl ModelTier {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct ChatMessage {
-    role: String,
-    content: String,
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ChatMessage {
+    pub role: String,
+    pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -266,8 +268,13 @@ impl LLMOrchestrator {
         let messages = vec![ChatMessage {
             role: "user".to_string(),
             content: prompt.to_string(),
+            reasoning: None,
         }];
 
+        self.speak_messages_internal(messages, model).await
+    }
+
+    async fn speak_messages_internal(&self, messages: Vec<ChatMessage>, model: &str) -> Result<String, String> {
         let request = ChatRequest {
             model: model.to_string(),
             messages,
@@ -305,6 +312,34 @@ impl LLMOrchestrator {
             .to_string();
 
         Ok(content)
+    }
+
+    pub async fn speak_messages(
+        &self,
+        messages: Vec<ChatMessage>,
+        tier: Option<ModelTier>,
+    ) -> Result<String, String> {
+        let model = tier
+            .map(|t| t.resolve())
+            .unwrap_or_else(|| self.default_model.clone());
+
+        match self.speak_messages_internal(messages.clone(), &model).await {
+            Ok(response) => Ok(response),
+            Err(_) => {
+                // Try fallback on failure
+                self.speak_messages_with_fallback(messages).await
+            }
+        }
+    }
+
+    pub async fn speak_messages_with_fallback(&self, messages: Vec<ChatMessage>) -> Result<String, String> {
+        for model in &self.fallback_models {
+            match self.speak_messages_internal(messages.clone(), model).await {
+                Ok(response) => return Ok(response),
+                Err(_) => continue,
+            }
+        }
+        Err("All models failed — Phoenix cannot speak.".to_string())
     }
 
     pub async fn speak(
@@ -347,6 +382,7 @@ impl LLMOrchestrator {
         let messages = vec![ChatMessage {
             role: "user".to_string(),
             content: prompt.to_string(),
+            reasoning: None,
         }];
 
         let request = ChatRequest {
