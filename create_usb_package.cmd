@@ -83,11 +83,11 @@ if exist "%SCRIPT_DIR%.git" (
     copy "%SCRIPT_DIR%Cargo.toml" "%USB_DIR%\" >nul 2>&1
     copy "%SCRIPT_DIR%Cargo.lock" "%USB_DIR%\" >nul 2>&1
     
-    REM Copy all crate directories (but exclude target and node_modules)
+    REM Copy all crate directories (but exclude already-copied directories, target, and node_modules)
     setlocal enabledelayedexpansion
     for /d %%d in ("%SCRIPT_DIR%*") do (
         set "dir_name=%%~nxd"
-        if /i not "!dir_name!"=="target" if /i not "!dir_name!"=="node_modules" if /i not "!dir_name!"=="USB_Package" if /i not "!dir_name!"==".git" (
+        if /i not "!dir_name!"=="target" if /i not "!dir_name!"=="node_modules" if /i not "!dir_name!"=="USB_Package" if /i not "!dir_name!"==".git" if /i not "!dir_name!"=="phoenix-web" if /i not "!dir_name!"=="frontend" (
             if exist "%%d\Cargo.toml" (
                 echo Copying crate: !dir_name!
                 xcopy /E /I /Y "%%d" "%USB_DIR%\!dir_name!" >nul 2>&1
