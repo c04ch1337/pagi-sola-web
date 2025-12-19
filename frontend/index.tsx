@@ -3553,7 +3553,7 @@ const DashboardLayout = () => {
   };
 
   return (
-    <div className="flex h-screen w-full bg-[#0f0b15] overflow-hidden font-sans">
+    <div className="flex h-[100dvh] w-full bg-[#0f0b15] overflow-hidden font-sans">
       <ConfirmationModal 
         isOpen={isClearModalOpen}
         onClose={() => setIsClearModalOpen(false)}

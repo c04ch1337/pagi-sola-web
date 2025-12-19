@@ -6,19 +6,21 @@ export default defineConfig(({ mode }) => {
     // Load env from repo root so `VITE_*` can live alongside the Rust `.env`.
     const repoRoot = path.resolve(__dirname, '..');
     const env = loadEnv(mode, repoRoot, '');
+    const apiBase = env.VITE_PHOENIX_API_BASE || 'http://127.0.0.1:8888';
     return {
       server: {
         port: parseInt(env.VITE_PORT || '3000', 10),
         host: '0.0.0.0',
         proxy: {
-          // Local dev: proxy API calls to the Rust backend.
-          // Backend URL configurable via VITE_PHOENIX_API_BASE (default: http://127.0.0.1:8888)
+          // Local dev:
+          // - Frontend dev server: VITE_PORT (default: 3000)
+          // - Backend API (phoenix-web): VITE_PHOENIX_API_BASE (default: http://127.0.0.1:8888)
           '/api': {
-            target: env.VITE_PHOENIX_API_BASE || 'http://127.0.0.1:8888',
+            target: apiBase,
             changeOrigin: true,
           },
           '/health': {
-            target: env.VITE_PHOENIX_API_BASE || 'http://127.0.0.1:8888',
+            target: apiBase,
             changeOrigin: true,
           },
         },

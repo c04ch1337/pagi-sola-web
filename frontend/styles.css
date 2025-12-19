@@ -1,11 +1,26 @@
 /* Tailwind v4 entrypoint */
 @import "tailwindcss";
-@config "./tailwind.config.cjs";
+/* Tailwind v4: config is auto-discovered by `@tailwindcss/postcss` (see `frontend/tailwind.config.cjs`). */
 
 /* frontend/styles.css
  *
  * Global styles and small custom classes.
  */
+
+/*
+ * Ensure the app never renders under browser/OS UI overlays.
+ * This helps with notch/safe-area devices and embedded webviews.
+ */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  padding-top: env(safe-area-inset-top, 0px);
+}
 
 body {
   background-color: #0f0b15;
@@ -33,6 +48,7 @@ body {
 
 .gradient-text {
   background: linear-gradient(to right, #f472b6, #a78bfa);
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }

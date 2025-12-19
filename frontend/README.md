@@ -12,6 +12,10 @@ View your app in AI Studio: https://ai.studio/apps/drive/1woXeutm4o_0KtddP_V5S9q
 
 **Prerequisites:** Node.js, Rust toolchain (for the Phoenix backend)
 
+**Default ports:**
+- Frontend dev server (Vite): `http://localhost:3000`
+- Backend API (phoenix-web): `http://127.0.0.1:8888`
+
 
 ### 1) Start the Phoenix UI backend (HTTP API)
 
