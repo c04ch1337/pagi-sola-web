@@ -311,7 +311,7 @@ const MOCK_AGENTS: Agent[] = [
 ];
 
 // --- Mock Phoenix Backend Service ---
-const PHOENIX_API_BASE = ((import.meta as any).env.VITE_PHOENIX_API_BASE as string | undefined)?.replace(/\/$/, '') || '';
+const PHOENIX_API_BASE = ((import.meta as any).env?.VITE_PHOENIX_API_BASE as string | undefined)?.replace(/\/$/, '') || '';
 
 function apiUrl(path: string) {
   // If VITE_PHOENIX_API_BASE isn't set, we rely on the Vite dev proxy (`/api/*` to the backend).

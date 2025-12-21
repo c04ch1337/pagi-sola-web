@@ -5,7 +5,7 @@ type SystemStatus = {
   self_modification_enabled: boolean;
 };
 
-const PHOENIX_API_BASE = ((import.meta as any).env.VITE_PHOENIX_API_BASE as string | undefined)?.replace(/\/$/, '') || '';
+const PHOENIX_API_BASE = ((import.meta as any).env?.VITE_PHOENIX_API_BASE as string | undefined)?.replace(/\/$/, '') || '';
 
 function apiUrl(path: string) {
   // If VITE_PHOENIX_API_BASE isn't set, we rely on same-origin (prod) or Vite dev proxy.
