@@ -6,10 +6,10 @@ export default defineConfig(({ mode }) => {
     // Load env from repo root so `VITE_*` can live alongside the Rust `.env`.
     const repoRoot = path.resolve(__dirname, '..');
     const env = loadEnv(mode, repoRoot, '');
-    const apiBase = env.VITE_PHOENIX_API_BASE || 'http://127.0.0.1:8888';
+    const apiBase = 'http://127.0.0.1:5000'; // Hardcoded to use port 5000
     return {
       server: {
-        port: parseInt(env.VITE_PORT || '3000', 10),
+        port: 8888, // Hardcoded to use port 8888
         host: '0.0.0.0',
         proxy: {
           // Local dev:

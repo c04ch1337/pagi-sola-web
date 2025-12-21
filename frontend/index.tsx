@@ -311,7 +311,7 @@ const MOCK_AGENTS: Agent[] = [
 ];
 
 // --- Mock Phoenix Backend Service ---
-const PHOENIX_API_BASE = ((import.meta as any).env?.VITE_PHOENIX_API_BASE as string | undefined)?.replace(/\/$/, '') || '';
+const PHOENIX_API_BASE = 'http://localhost:5000'; // Hardcoded to use port 5000 for backend
 
 function apiUrl(path: string) {
   // If VITE_PHOENIX_API_BASE isn't set, we rely on the Vite dev proxy (`/api/*` to the backend).
@@ -785,7 +785,7 @@ const BackgroundEffects: React.FC = () => {
   );
 
   return (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden select-none">
+    <div className="absolute inset-0 pointer-events-none select-none" style={{zIndex: 0, overflow: 'visible'}}>
       <div className="absolute inset-0 bg-rose-950/10 animate-heartbeat-slow z-0"></div>
       {blobs.map((b, i) => (
         <div
@@ -1465,7 +1465,7 @@ const GoogleEcosystemView = () => {
       <ComposeEmailModal isOpen={isComposeOpen} onClose={() => setIsComposeOpen(false)} onSend={handleSendEmail} />
 
       {/* Header */}
-      <div className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-void-800/80 backdrop-blur-md shrink-0" style={{paddingTop: `max(env(safe-area-inset-top, 0px), 0px)`, minHeight: `calc(5rem + max(env(safe-area-inset-top, 0px), 0px))`}}>
+      <div className="border-b border-white/5 flex items-center justify-between px-8 bg-void-800/80 backdrop-blur-md shrink-0 header-safe">
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 rounded-xl bg-linear-to-br from-blue-500 to-green-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
             <Cloud size={24} className="text-white" />
@@ -2130,7 +2130,7 @@ const MemoriesView = () => {
       />
 
       {/* Header */}
-      <div className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-void-800/80 backdrop-blur-md shrink-0" style={{paddingTop: `max(env(safe-area-inset-top, 0px), 0px)`, minHeight: `calc(5rem + max(env(safe-area-inset-top, 0px), 0px))`}}>
+      <div className="border-b border-white/5 flex items-center justify-between px-8 bg-void-800/80 backdrop-blur-md shrink-0 header-safe">
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 rounded-xl bg-linear-to-br from-phoenix-600 to-purple-600 flex items-center justify-center shadow-lg shadow-phoenix-600/20">
             <Brain size={22} className="text-white" />
@@ -2505,12 +2505,12 @@ const ChatView = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
   };
 
   return (
-    <div className="flex flex-col h-full relative overflow-hidden">
+    <div className="flex flex-col h-full relative justify-start items-stretch pt-4 overflow-y-auto" style={{position: 'relative', zIndex: 0}}>
        {/* Background Effects Layer */}
        <BackgroundEffects />
 
        {/* Chat Header */}
-       <div className="h-20 border-b border-white/5 flex items-center justify-between px-6 bg-void-800/80 backdrop-blur-md z-30 shadow-lg shadow-rose-900/5 shrink-0" style={{paddingTop: `max(env(safe-area-inset-top, 0px), 0px)`, minHeight: `calc(5rem + max(env(safe-area-inset-top, 0px), 0px))`}}>
+       <div className="border-b border-white/5 flex items-center justify-between px-6 bg-void-800/80 backdrop-blur-md z-30 shadow-lg shadow-rose-900/5 shrink-0 header-safe">
           <div className="flex items-center gap-4">
              {/* Personalized Avatar */}
              <div className="relative group cursor-pointer">
@@ -2524,7 +2524,7 @@ const ChatView = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
                 <div className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-[3px] border-[#1a1625] ${isConnected ? 'bg-emerald-400' : 'bg-rose-500'} animate-bounce shadow-sm`} />
              </div>
 
-             <div className="flex flex-col justify-center">
+             <div className="flex flex-col">
                <div className="flex items-center gap-2 mb-0.5">
                   <Heart size={18} className="text-rose-400 fill-rose-500/20 animate-pulse drop-shadow-[0_0_8px_rgba(244,63,94,0.5)]" />
                   <span className="font-bold text-transparent bg-clip-text bg-linear-to-r from-rose-200 via-amber-200 to-rose-200 tracking-wide text-lg drop-shadow-sm">
@@ -2638,9 +2638,9 @@ const ChatView = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
          </div>
        )}
        
-       <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-6 relative z-10 pt-8 pb-4">
+       <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-6 relative z-10 pt-8 pb-4 min-h-0" style={{pointerEvents: 'auto', overflowAnchor: 'none', overflowX: 'hidden', justifyContent: 'flex-start', display: 'flex', flexDirection: 'column'}}>
          {messages.length === 0 && (
-           <div className="flex flex-col items-center justify-center h-full text-center opacity-50 select-none">
+           <div className="flex flex-col items-center text-center opacity-50 select-none pointer-events-none" style={{marginTop: 'auto', marginBottom: 'auto', paddingTop: '2rem', paddingBottom: '2rem'}}>
              <div className="w-20 h-20 bg-linear-to-br from-phoenix-500/20 to-purple-500/20 rounded-full flex items-center justify-center mb-6 animate-pulse">
                <Sparkles size={32} className="text-phoenix-400" />
              </div>
@@ -2706,47 +2706,57 @@ const ChatView = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
          <div ref={messagesEndRef} />
        </div>
 
-       <div className="p-4 border-t border-white/5 bg-void-900/80 backdrop-blur-xl relative z-20">
-         <div className="relative flex items-center gap-2 max-w-4xl mx-auto">
+       <div className="p-4 border-t border-white/5 bg-void-900/80 backdrop-blur-xl flex-shrink-0 relative z-[9999]" style={{pointerEvents: 'auto', backgroundColor: '#0d0d0d'}}>
+         <div className="relative flex items-center gap-2 max-w-4xl mx-auto z-30" style={{pointerEvents: 'auto'}}>
             <button
-              className="p-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-colors"
+              className="p-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-colors relative z-30"
               aria-label="Add attachment"
               title="Add attachment"
+              style={{pointerEvents: 'auto'}}
             >
               <Plus size={20} />
             </button>
-           <input
-             type="text"
-             value={input}
-             onChange={(e) => setInput(e.target.value)}
-             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-             placeholder={isConnected ? `Message ${currentArchetype?.name || phoenixName}...` : "Connecting to neural interface..."}
-             className="w-full bg-void-800/50 border border-white/10 rounded-xl pl-4 pr-12 py-3.5 text-white focus:border-phoenix-500/50 focus:bg-void-800 outline-none transition-all placeholder:text-gray-600"
-             disabled={!isConnected}
-             aria-label="Message input"
-             aria-disabled={!isConnected}
-             role="textbox"
-             id="message-input"
-           />
-           <div className="absolute right-2 flex items-center gap-1">
-             <button
-               onClick={toggleVoiceInput}
-               className={`p-2 rounded-lg transition-all ${isListening ? 'text-red-400 bg-red-500/20 animate-pulse' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
-               title="Voice Input"
-               aria-label="Toggle voice input"
-               aria-pressed={isListening}
-             >
-               <Mic size={18} />
-             </button>
-             <button
-               onClick={handleSend}
-               disabled={!input.trim() || !isConnected}
-               className={`p-2 bg-phoenix-600 rounded-lg text-white hover:bg-phoenix-500 disabled:opacity-50 disabled:bg-transparent disabled:text-gray-500 transition-all shadow-lg shadow-phoenix-600/20 ${input.trim() ? 'animate-subtle-bounce' : ''}`}
-               aria-label="Send message"
-               title="Send message"
-             >
-               <Send size={18} />
-             </button>
+           <div className="relative flex-1 z-30" style={{pointerEvents: 'auto'}}>
+             <input
+               type="text"
+               value={input}
+               onChange={(e) => setInput(e.target.value)}
+               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+               placeholder={isConnected ? `Message ${currentArchetype?.name || phoenixName}...` : "Connecting to neural interface..."}
+               className="w-full bg-void-800/50 border border-white/10 rounded-xl pl-4 pr-12 py-3.5 text-white focus:border-phoenix-500/50 focus:bg-void-800 outline-none transition-all placeholder:text-gray-600 relative z-30"
+               style={{pointerEvents: 'auto', cursor: 'text'}}
+               disabled={!isConnected}
+               aria-label="Message input"
+               aria-disabled={!isConnected}
+               role="textbox"
+               id="message-input"
+               autoFocus={false}
+               onClick={(e) => { e.stopPropagation(); e.currentTarget.focus(); }}
+               onFocus={(e) => { e.stopPropagation(); }}
+               onMouseDown={(e) => { e.stopPropagation(); }}
+             />
+             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1" style={{position: 'absolute', zIndex: 33, pointerEvents: 'auto'}}>
+               <button
+                 onClick={(e) => { e.stopPropagation(); toggleVoiceInput(); }}
+                 className={`p-2 rounded-lg transition-all ${isListening ? 'text-red-400 bg-red-500/20 animate-pulse' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                 title="Voice Input"
+                 aria-label="Toggle voice input"
+                 aria-pressed={isListening}
+                 style={{pointerEvents: 'auto'}}
+               >
+                 <Mic size={18} />
+               </button>
+               <button
+                 onClick={(e) => { e.stopPropagation(); handleSend(); }}
+                 disabled={!input.trim() || !isConnected}
+                 className={`p-2 bg-phoenix-600 rounded-lg text-white hover:bg-phoenix-500 disabled:opacity-50 disabled:bg-transparent disabled:text-gray-500 transition-all shadow-lg shadow-phoenix-600/20 ${input.trim() ? 'animate-subtle-bounce' : ''}`}
+                 aria-label="Send message"
+                 title="Send message"
+                 style={{pointerEvents: 'auto'}}
+               >
+                 <Send size={18} />
+               </button>
+             </div>
            </div>
          </div>
        </div>
@@ -3214,7 +3224,7 @@ const OrchestratorView = () => {
   if (selectedAgent) {
     return (
       <div className="flex flex-col h-full bg-[#0f0b15]">
-        <div className="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-void-800/50 backdrop-blur-md" style={{paddingTop: `max(env(safe-area-inset-top, 0px), 0px)`, minHeight: `calc(4rem + max(env(safe-area-inset-top, 0px), 0px))`}}>
+        <div className="border-b border-white/5 flex items-center justify-between px-6 bg-void-800/50 backdrop-blur-md header-safe-sm">
           <div className="flex items-center gap-4">
              <button onClick={() => setSelectedAgentId(null)} className="text-gray-400 hover:text-white transition-colors">
                <ChevronRight size={20} className="rotate-180" />
@@ -3478,7 +3488,7 @@ const EcoSystemView = () => {
   return (
     <div className="h-full flex flex-col bg-[#0f0b15]">
       {/* Header */}
-      <div className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-void-800/80 backdrop-blur-md shrink-0" style={{paddingTop: `max(env(safe-area-inset-top, 0px), 0px)`, minHeight: `calc(5rem + max(env(safe-area-inset-top, 0px), 0px))`}}>
+      <div className="border-b border-white/5 flex items-center justify-between px-8 bg-void-800/80 backdrop-blur-md shrink-0 header-safe">
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 rounded-xl bg-linear-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
             <GitBranch size={24} className="text-white" />
@@ -3659,8 +3669,8 @@ const DashboardLayout = () => {
   };
 
   return (
-    <div className="flex h-[100dvh] w-full bg-[#0f0b15] overflow-hidden font-sans">
-      <ConfirmationModal 
+    <div className="flex h-[100dvh] w-full bg-[#0f0b15] font-sans" style={{overflow: 'visible', position: 'relative', zIndex: 0}}>
+      <ConfirmationModal
         isOpen={isClearModalOpen}
         onClose={() => setIsClearModalOpen(false)}
         onConfirm={clearHistory}
@@ -3696,8 +3706,8 @@ const DashboardLayout = () => {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-        <div className="lg:hidden h-16 flex items-center px-4 border-b border-white/5 justify-between" style={{paddingTop: `max(env(safe-area-inset-top, 0px), 0px)`, minHeight: `calc(4rem + max(env(safe-area-inset-top, 0px), 0px))`}}>
+      <div className="flex-1 flex flex-col h-full relative" style={{overflowY: 'auto'}}>
+        <div className="lg:hidden flex items-center px-4 border-b border-white/5 justify-between header-safe-sm">
           <button onClick={() => setIsMobileMenuOpen(true)} className="text-gray-300"><Menu size={24} /></button>
           <span className="font-semibold text-gray-200 capitalize">{activeView}</span>
           <div className="w-6" />
