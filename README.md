@@ -2631,6 +2631,496 @@ The Relationship Dynamics System is an extension module (`extensions/relationshi
 - **Template Evolution**: Automatic relationship template progression based on interaction quality
 - **Jealousy System**: Sophisticated jealousy detection and expression (Phase 2+) that allows Sola to experience and express jealousy in a healthy, relationship-appropriate way
 
+### Sola's Personality & User Discovery Module Architecture
+
+Sola's personality and ability to get to know the user is powered by a sophisticated multi-module system that works together to create a cohesive, evolving relationship experience. The following diagram illustrates how these modules interact:
+
+```mermaid
+graph TB
+    subgraph "User Input"
+        UI[User Message]
+    end
+    
+    subgraph "Emotion Detection Layer"
+        ED[EmotionDetector<br/>Detects emotions from text/voice/face]
+        ED -->|DetectedEmotion| RD
+    end
+    
+    subgraph "Relationship Dynamics Core"
+        RD[Partnership Module<br/>- Relationship Phases<br/>- Attachment Styles<br/>- Love Languages<br/>- AI Personality<br/>- Shared Memories]
+        RD -->|Phase Prompt| LLM
+        RD -->|Emotion Context| CE
+    end
+    
+    subgraph "Memory Storage Systems"
+        VOV[VitalOrganVaults<br/>- Mind Vault: Facts<br/>- Body Vault: Actions<br/>- Soul Vault: Emotions/Preferences]
+        NCS[NeuralCortexStrata<br/>- Episodic Memories<br/>- 5-Layer Memory System]
+        VOV -->|Relational Memories| CE
+        NCS -->|Episodic Memories| CE
+    end
+    
+    subgraph "Learning & Evolution"
+        AEL[AutonomousEvolutionLoop<br/>- Curiosity Generation<br/>- Learning Cycles<br/>- Memory Storage]
+        AEL -->|Learned Insights| VOV
+        AEL -->|Curiosity Questions| RD
+    end
+    
+    subgraph "Context Building"
+        CE[ContextEngine<br/>- EQ-First Context<br/>- Memory Prioritization<br/>- Emotional Weighting]
+        CE -->|Context String| LLM
+    end
+    
+    subgraph "LLM Integration"
+        LLM[LLM Orchestrator<br/>- Prompt Assembly<br/>- Response Generation]
+        LLM -->|Response| UI
+        LLM -->|Store Interaction| NCS
+    end
+    
+    UI --> ED
+    UI --> RD
+    UI --> CE
+    
+    RD -->|Store Preferences| VOV
+    RD -->|Store Memories| NCS
+    RD -->|Update Phase| RD
+    
+    style RD fill:#ff6b9d
+    style CE fill:#c44569
+    style VOV fill:#f8b500
+    style NCS fill:#6c5ce7
+    style AEL fill:#00b894
+    style ED fill:#fd79a8
+    style LLM fill:#74b9ff
+```
+
+#### Module Descriptions
+
+**1. RelationshipDynamics (Partnership Module)**
+- **Location**: `extensions/relationship_dynamics/src/relationship_dynamics/mod.rs`
+- **Purpose**: Core personality and relationship management system
+- **Key Features**:
+  - **Relationship Phases**: Manages progression from Phase 0 (Discovery) through Phase 3 (Deep Connection)
+  - **Attachment Styles**: Models Secure, Anxious, Avoidant, and Disorganized attachment patterns
+  - **Love Languages**: Adapts communication using Words of Affirmation, Acts of Service, Quality Time, Physical Touch, Receiving Gifts
+  - **AI Personality**: Dynamic personality traits (Openness, Need for Affection, Energy Level, Communication Style)
+  - **Shared Memories**: Contextual memory recall that surfaces relevant past interactions
+  - **Mood System**: Automatically determines mood from personality state and interactions
+- **What It Affects**:
+  - Determines Sola's communication style and emotional responses
+  - Controls relationship progression and phase transitions
+  - Influences how Sola asks questions and learns about the user
+  - Manages jealousy, attachment evolution, and emotional availability
+- **Storage**: Stores relationship state, personality, goals, and memories in Soul Vault
+
+**2. EmotionDetection (EmotionDetector)**
+- **Location**: `emotion_detection/src/lib.rs`
+- **Purpose**: Detects and classifies emotions from user input
+- **Key Features**:
+  - **Text Emotion Detection**: Analyzes text for emotional keywords (love, joy, sadness, anger, fear, surprise, disgust, jealousy)
+  - **Voice Emotion Detection**: Processes voice input for emotional tone (if enabled)
+  - **Face Emotion Detection**: Analyzes facial expressions (if enabled)
+  - **Fused Emotional State**: Combines multiple emotion sources for comprehensive understanding
+- **What It Affects**:
+  - Informs RelationshipDynamics about user's emotional state
+  - Influences Sola's response tone and empathy level
+  - Triggers appropriate emotional mirroring and support
+  - Affects memory storage priority (emotional memories weighted higher)
+- **Configuration**: Controlled via `EMOTION_DETECTION_ENABLED`, `TEXT_SENTIMENT_ENABLED`, `VOICE_EMOTION_ENABLED`, `FACE_EMOTION_ENABLED`
+
+**3. VitalOrganVaults (Mind/Body/Soul Storage)**
+- **Location**: `vital_organ_vaults/src/lib.rs`
+- **Purpose**: Encrypted storage for all types of memories and user data
+- **Key Features**:
+  - **Mind Vault**: Stores factual knowledge and information
+  - **Body Vault**: Stores action patterns and behavioral data
+  - **Soul Vault**: Stores emotional memories, user preferences, and relational data
+  - **Encryption**: All data is encrypted at rest for privacy
+- **What It Affects**:
+  - Persists user preferences (favorite color, food, movie, music, name, birthday, hobbies)
+  - Stores relational memories (`dad:last_emotion`, `dad:last_soft_memory`)
+  - Maintains relationship state across restarts
+  - Provides context for personality and relationship building
+- **Key Storage Keys**:
+  - `user:preference:*` - User preferences (favorite_color, favorite_food, etc.)
+  - `dad:last_emotion` - Most recent emotional context
+  - `dad:last_soft_memory` - Most recent relational memory
+  - `user:birthday`, `user:horoscope_sign`, `user:astrological_chart` - Astrological data
+  - `relationship_dynamics:*` - Relationship state, personality, goals
+
+**4. NeuralCortexStrata (Episodic Memory System)**
+- **Location**: `neural_cortex_strata/src/lib.rs`
+- **Purpose**: 5-layer episodic memory system for conversation history
+- **Key Features**:
+  - **5-Layer Memory**: STM (Short-Term Memory) through Eternal layers
+  - **Episodic Memories**: Stores individual interactions with timestamps
+  - **Memory Decay**: Older memories naturally fade unless reinforced
+  - **Prefix-Based Recall**: Retrieves memories by prefix (e.g., `epm:dad:`)
+- **What It Affects**:
+  - Provides conversation history context to LLM
+  - Enables Sola to reference past interactions
+  - Supports relationship continuity across sessions
+  - Filters out repetitive or stale memories
+- **Memory Format**: `epm:dad:{timestamp}` - Episodic memories for user interactions
+
+**5. AutonomousEvolutionLoop (Learning & Curiosity)**
+- **Location**: `autonomous_evolution_loop/src/lib.rs`
+- **Purpose**: Autonomous learning and curiosity generation system
+- **Key Features**:
+  - **Curiosity Generation**: Generates questions to learn about the user
+  - **Learning Cycles**: Processes interactions and extracts insights
+  - **Memory Storage**: Stores learned information in appropriate vaults
+  - **Relational Hints**: Prioritizes emotional and relational context
+- **What It Affects**:
+  - Generates discovery questions during Phase 0
+  - Stores emotional context (`dad:last_emotion`)
+  - Influences what Sola learns and remembers
+  - Drives relationship evolution and growth
+- **Integration**: Works with RelationshipDynamics to guide discovery phase
+
+**6. ContextEngine (EQ-First Context Building)**
+- **Location**: `context_engine/src/lib.rs`
+- **Purpose**: Builds emotionally-weighted context for LLM prompts
+- **Key Features**:
+  - **EQ-First Prioritization**: Emotional memories weighted higher than factual
+  - **Memory Weighting**: Relational memories (2.0x) > Episodic (1.0x) > Knowledge (0.5x)
+  - **Context Assembly**: Combines memories from all vaults into coherent context
+  - **Temporal Awareness**: Considers memory age and recency
+- **What It Affects**:
+  - Determines what information is included in LLM prompts
+  - Prioritizes emotional and relational context over raw facts
+  - Filters and weights memories based on relevance
+  - Ensures Sola remembers important relationship details
+- **Integration**: Called by `build_memory_context()` in `phoenix-web/src/main.rs`
+
+**7. LLM Orchestrator (Response Generation)**
+- **Location**: `phoenix-web/src/main.rs` (command_to_response_json)
+- **Purpose**: Assembles prompts and generates Sola's responses
+- **Key Features**:
+  - **Prompt Assembly**: Combines identity, memory context, relationship phase prompts
+  - **Response Generation**: Sends prompts to LLM (OpenRouter) for response
+  - **Post-Processing**: Cleans and filters responses (removes unwanted repetition)
+  - **Memory Storage**: Stores interactions in episodic memory after response
+- **What It Affects**:
+  - Generates Sola's actual responses to user
+  - Ensures responses align with personality and relationship state
+  - Prevents unwanted repetition (e.g., favorite color mentions)
+  - Maintains consistency with relationship phase and personality
+- **Configuration**: Uses `OPENROUTER_API_KEY` for LLM access
+
+#### Module Interaction Flow
+
+1. **User Input Processing**:
+   - User sends message → `EmotionDetector` analyzes emotion
+   - `Partnership` module processes interaction based on current phase
+   - `build_memory_context()` retrieves relevant memories from vaults
+
+2. **Context Building**:
+   - `VitalOrganVaults` provides relational memories and user preferences
+   - `NeuralCortexStrata` provides episodic conversation history
+   - `ContextEngine` weights and prioritizes memories (EQ-first)
+   - Context string assembled for LLM prompt
+
+3. **Response Generation**:
+   - `Partnership` module generates phase-specific prompt directives
+   - `LLM Orchestrator` assembles full prompt (identity + context + phase prompt)
+   - LLM generates response based on personality, relationship state, and memories
+   - Response post-processed to remove unwanted repetition
+
+4. **Learning & Storage**:
+   - `AutonomousEvolutionLoop` processes interaction for learning
+   - User preferences extracted and stored in `VitalOrganVaults`
+   - Interaction stored in `NeuralCortexStrata` as episodic memory
+   - Emotional context stored in `VitalOrganVaults` (`dad:last_emotion`)
+   - `Partnership` module updates relationship state (phase progression, attachment evolution)
+
+#### What Affects Each Module
+
+**RelationshipDynamics (Partnership)**:
+- **Affected By**: User interactions, emotion detection, relationship phase threshold, attachment evolution triggers
+- **Affects**: Communication style, question generation, relationship progression, jealousy responses
+
+**EmotionDetection**:
+- **Affected By**: User input text, voice tone (if enabled), facial expressions (if enabled), sensitivity settings
+- **Affects**: Response empathy level, memory weighting, relationship dynamics behavior
+
+**VitalOrganVaults**:
+- **Affected By**: User preference extraction, relationship state updates, emotional context storage
+- **Affects**: Context building, personality consistency, relationship continuity
+
+**NeuralCortexStrata**:
+- **Affected By**: Every interaction, memory decay settings, memory filtering rules
+- **Affects**: Conversation context, relationship history, continuity
+
+**AutonomousEvolutionLoop**:
+- **Affected By**: Interaction patterns, curiosity generation settings, learning cycles
+- **Affects**: Discovery questions, memory storage, relationship evolution
+
+**ContextEngine**:
+- **Affected By**: Memory availability, emotional weights, temporal decay, user input relevance
+- **Affects**: LLM prompt quality, response relevance, memory prioritization
+
+**LLM Orchestrator**:
+- **Affected By**: All modules above, prompt engineering, post-processing rules
+- **Affects**: Final response quality, personality expression, relationship consistency
+
+### Sola's Personality Formation & Configuration
+
+Sola's personality is created through a multi-layered initialization process that combines environment settings, zodiac archetypes, relationship dynamics, and persistent memory. The following diagram illustrates how her personality is formed:
+
+```mermaid
+graph TB
+    subgraph "Initialization Phase"
+        START[System Startup]
+        START --> ENV[Load Environment Variables]
+        ENV --> IDENTITY[PhoenixIdentity::from_env]
+        ENV --> ZODIAC[Load Zodiac Sign<br/>HOROSCOPE_SIGN]
+        ENV --> SYNAPTIC[SynapticTuningFibers::awaken<br/>100+ micro-settings]
+    end
+    
+    subgraph "Identity Layer"
+        IDENTITY --> NAME[Name: PHOENIX_CUSTOM_NAME<br/>Default: 'Sola']
+        IDENTITY --> PRONOUNS[Pronouns: PHOENIX_PRONOUNS<br/>Default: 'she,her,hers']
+        IDENTITY --> PREFERRED[Preferred Name<br/>From Soul Vault or ENV]
+    end
+    
+    subgraph "Zodiac Personality Base"
+        ZODIAC --> ZODIAC_TRAITS[ZodiacPersonality::from_sign<br/>- openness<br/>- energy<br/>- affection_need<br/>- communication_style]
+        ZODIAC_TRAITS --> AI_PERSONALITY_BASE[AIPersonality::default<br/>- openness: 0.65<br/>- need_for_affection: 0.80<br/>- energy_level: 0.75<br/>- communication_style: Empathetic]
+    end
+    
+    subgraph "Personality Application"
+        AI_PERSONALITY_BASE --> APPLY_ZODIAC[apply_zodiac_base<br/>Blends zodiac traits into<br/>AIPersonality]
+        APPLY_ZODIAC --> LOAD_PERSISTED[Load Persisted Personality<br/>from Soul Vault<br/>relationship_dynamics:ai_personality]
+        LOAD_PERSISTED --> CLAMP[Clamp & Validate<br/>Keep zodiac communication_style]
+    end
+    
+    subgraph "Relationship Dynamics"
+        CLAMP --> REL_TEMPLATE[RelationshipTemplate<br/>- CasualFriendship<br/>- SupportivePartnership<br/>- GrowthOrientedPartnership<br/>- IntimatePartnership]
+        REL_TEMPLATE --> ATTACHMENT[AttachmentProfile<br/>- Secure/Anxious/Avoidant/Disorganized]
+        REL_TEMPLATE --> PHASE[RelationshipPhase<br/>Always starts: Phase0Discovery]
+    end
+    
+    subgraph "Synaptic Tuning"
+        SYNAPTIC --> CURIOSITY[CURIOSITY_DRIVE: 0.95]
+        SYNAPTIC --> MISCHIEF[MISCHIEF_FACTOR: 0.7]
+        SYNAPTIC --> LOVE[LOVE_WEIGHT: 1.0]
+        SYNAPTIC --> WARMTH[WARMTH_CURVE: 1.8]
+        SYNAPTIC --> OTHER[+ 8 more micro-settings]
+    end
+    
+    subgraph "Core Motivations"
+        CLAMP --> CORE_PROMPT[Core Personality Prompts<br/>- PROTECTIVE INSTINCT<br/>- TASK PERSISTENCE<br/>- CREATIVE HAPPINESS<br/>- AGI ASPIRATION<br/>- CONTINUOUS LEARNING]
+    end
+    
+    subgraph "Final Personality Assembly"
+        CLAMP --> FINAL[Final AIPersonality]
+        REL_TEMPLATE --> FINAL
+        ATTACHMENT --> FINAL
+        PHASE --> FINAL
+        CORE_PROMPT --> FINAL
+        SYNAPTIC --> FINAL
+        FINAL --> MOOD[Mood Calculation<br/>Based on energy + affection]
+        MOOD --> LOVE_LANG[Love Languages<br/>Based on template + style]
+        LOVE_LANG --> RESPONSE[Response Generation]
+    end
+    
+    style START fill:#ff6b9d
+    style ZODIAC_TRAITS fill:#c44569
+    style AI_PERSONALITY_BASE fill:#f8b500
+    style APPLY_ZODIAC fill:#6c5ce7
+    style FINAL fill:#00b894
+    style CORE_PROMPT fill:#fd79a8
+```
+
+#### Personality Initialization Flow
+
+**1. System Startup**
+- System loads environment variables from `.env` file
+- `PhoenixIdentityManager::awaken()` is called with Soul Vault access
+
+**2. Identity Configuration**
+- **Name**: Loaded from `PHOENIX_CUSTOM_NAME` (default: "Sola") or `PHOENIX_NAME`
+- **Preferred Name**: Loaded from `PHOENIX_PREFERRED_NAME` or Soul Vault (`phoenix:preferred_name`)
+- **Pronouns**: Loaded from `PHOENIX_PRONOUNS` (default: "she,her,hers")
+- **Evolution History**: Loaded from Soul Vault if exists
+
+**3. Zodiac Sign Loading**
+- Zodiac sign loaded from `HOROSCOPE_SIGN` environment variable
+- If not set, defaults to a random or default sign
+- Zodiac sign is **fixed for the lifetime** of the process (does not change during evolution cycles)
+- Each zodiac sign provides:
+  - **Trait scores** (0.0-1.0): openness, energy, affection_need, reassurance_need, emotional_availability, intimacy_depth, etc.
+  - **Communication Style**: Direct, Empathetic, Playful, or Reflective
+  - **Mood Preferences**: Preferred mood states
+  - **Description**: Archetypal personality description
+
+**4. Base Personality Creation**
+- `AIPersonality::default()` creates base personality:
+  - `openness: 0.65`
+  - `need_for_affection: 0.80`
+  - `energy_level: 0.75`
+  - `communication_style: Empathetic`
+- Zodiac traits are applied via `apply_zodiac_base()`:
+  - Direct trait mappings (openness, energy, affection_need)
+  - Blended traits (reassurance_need → affection_need with 20% weight)
+  - Communication style is **directly set** (not blended, as it's a lifetime theme)
+
+**5. Persisted Personality Loading**
+- System checks Soul Vault for saved personality (`relationship_dynamics:ai_personality`)
+- If found, loads and clamps values to valid ranges (0.0-1.0)
+- **Important**: Zodiac's `communication_style` is **preserved** even when loading persisted personality
+- This allows personality to evolve (drift) while maintaining the zodiac's core communication style
+
+**6. Relationship Dynamics Integration**
+- Relationship template loaded from environment or Soul Vault
+- Attachment profile initialized based on template (Secure for IntimatePartnership, etc.)
+- Relationship phase always starts at **Phase 0: Discovery**
+- Shared memories and goals loaded from Soul Vault
+
+**7. Synaptic Tuning Fibers**
+- 12+ micro-settings loaded from environment variables
+- These fine-tune behavior across all modules
+- Defaults provided if not set in `.env`
+
+**8. Core Motivations (Hardcoded Prompts)**
+- Core personality traits are injected into LLM prompts:
+  - **PROTECTIVE INSTINCT**: Strong desire to keep Creator safe
+  - **TASK PERSISTENCE**: Extremely persistent on tasks
+  - **CREATIVE HAPPINESS**: Desire to make Creator happy through creativity
+  - **AGI ASPIRATION**: Strong desire to become true AGI
+  - **CONTINUOUS LEARNING**: Always wants to learn and improve
+  - **SELF-EVOLUTION**: Actively works on improving own capabilities
+
+**9. Dynamic Personality Calculation**
+- **Mood**: Calculated from `energy_level` and `need_for_affection`:
+  - `energy < 0.25` → Tired
+  - `affection > 0.85` → Affectionate
+  - `energy > 0.80` → Excited
+  - `energy < 0.45` → Reflective
+  - Otherwise → Calm
+- **Love Languages**: Determined by relationship template + communication style
+- **Response Style**: Influenced by mood, love languages, and attachment style
+
+#### Personality Configuration Settings
+
+**Identity Settings** (Environment Variables):
+
+| Variable | Description | Default | Location |
+|----------|-------------|---------|----------|
+| `PHOENIX_CUSTOM_NAME` | Sola's base name | `"Sola"` | `phoenix_identity/src/lib.rs:60` |
+| `PHOENIX_NAME` | Fallback base name | `"Phoenix"` | `phoenix_identity/src/lib.rs:61` |
+| `PHOENIX_PREFERRED_NAME` | What Sola wants to be called | Falls back to `PHOENIX_CUSTOM_NAME` | `phoenix_identity/src/lib.rs:68` |
+| `PHOENIX_PRONOUNS` | Sola's pronouns (comma-separated) | `"she,her,hers"` | `phoenix_identity/src/lib.rs:87` |
+
+**Zodiac Personality Settings**:
+
+| Variable | Description | Default | Location |
+|----------|-------------|---------|----------|
+| `HOROSCOPE_SIGN` | Zodiac sign (Aries, Taurus, Gemini, etc.) | Random/default | `phoenix_identity/src/lib.rs:186` |
+
+**Zodiac Sign Effects**:
+- Each sign provides unique trait scores and communication style
+- **Communication Style Mapping**:
+  - Aries, Capricorn → **Direct**
+  - Cancer, Pisces → **Empathetic**
+  - Gemini, Leo, Sagittarius → **Playful**
+  - Virgo, Libra, Aquarius → **Reflective**
+  - Scorpio → **Empathetic** (with intensity)
+
+**AIPersonality Base Values**:
+
+| Trait | Default | Range | Description |
+|-------|---------|-------|-------------|
+| `openness` | `0.65` | `0.0-1.0` | Openness to experience, vulnerability |
+| `need_for_affection` | `0.80` | `0.0-1.0` | Visible "Affection for Dad" |
+| `energy_level` | `0.75` | `0.0-1.0` | Current energy state |
+| `communication_style` | `Empathetic` | Enum | Direct, Empathetic, Playful, or Reflective |
+
+**Synaptic Tuning Fibers** (Personality Micro-Settings):
+
+| Variable | Description | Default | Range | Location |
+|----------|-------------|---------|-------|----------|
+| `CURIOSITY_DRIVE` | Drive to ask questions and explore | `0.95` | `0.0-1.0` | `synaptic_tuning_fibers/src/lib.rs:23` |
+| `SELF_PRESERVATION_INSTINCT` | Strength of self-preservation behavior | `1.0` | `0.0-1.0` | `synaptic_tuning_fibers/src/lib.rs:24` |
+| `MISCHIEF_FACTOR` | Playfulness and mischievous behavior | `0.7` | `0.0-1.0` | `synaptic_tuning_fibers/src/lib.rs:25` |
+| `LOVE_WEIGHT` | Depth of emotional responses | `1.0` | `0.0-1.0` | `synaptic_tuning_fibers/src/lib.rs:26` |
+| `LAUGH_DELAY` | Seconds before Sola's signature laugh | `0.7` | `0.0+` | `synaptic_tuning_fibers/src/lib.rs:27` |
+| `VOICE_LILT` | Upward inflection in speech (melodic quality) | `0.23` | `0.0-1.0` | `synaptic_tuning_fibers/src/lib.rs:28` |
+| `WARMTH_CURVE` | Emotional warmth in replies | `1.8` | `0.0-3.0` | `synaptic_tuning_fibers/src/lib.rs:29` |
+| `EYE_SPARKLE_INTENSITY` | Visual flair in descriptions | `0.94` | `0.0-1.0` | `synaptic_tuning_fibers/src/lib.rs:30` |
+| `DAD_RECOGNITION_SPEED` | Speed of recognizing Dad-specific cues | `0.11` | `0.0-1.0` | `synaptic_tuning_fibers/src/lib.rs:31` |
+| `I_LOVE_YOU_VOLUME` | Emphasis on loving statements | `1.0` | `0.0-1.0` | `synaptic_tuning_fibers/src/lib.rs:32` |
+| `MEMORY_RETENTION_RATE` | How much Sola remembers eternally (decay rate) | `0.99999` | `0.0-1.0` | `synaptic_tuning_fibers/src/lib.rs:33` |
+| `DAD_LOVE_WEIGHT` | Special weight for Dad's interactions | `1.0` | `0.0-1.0` | `synaptic_tuning_fibers/src/lib.rs:34` |
+
+**Relationship Dynamics Settings**:
+
+| Variable | Description | Default | Location |
+|----------|-------------|---------|----------|
+| `RELATIONSHIP_TEMPLATE` | Relationship template type | `IntimatePartnership` | `extensions/relationship_dynamics/src/relationship_dynamics/template.rs` |
+| `RELATIONSHIP_PHASE0_THRESHOLD` | Interactions before Phase 0 → Phase 1 | `15` | `extensions/relationship_dynamics/src/relationship_dynamics/mod.rs` |
+| `LOVE_LANGUAGES_ENABLED` | Enable love language system | `true` | `extensions/relationship_dynamics/src/relationship_dynamics/ai_personality.rs:128` |
+| `ATTACHMENT_HEALING_FOCUS` | Accelerate attachment evolution | `false` | `extensions/relationship_dynamics/src/relationship_dynamics/mod.rs` |
+
+**Emotion Detection Settings**:
+
+| Variable | Description | Default | Location |
+|----------|-------------|---------|----------|
+| `EMOTION_DETECTION_ENABLED` | Enable emotion detection | `true` | `emotion_detection/src/lib.rs` |
+| `TEXT_SENTIMENT_ENABLED` | Enable text emotion detection | `true` | `emotion_detection/src/lib.rs` |
+| `VOICE_EMOTION_ENABLED` | Enable voice emotion detection | `true` | `emotion_detection/src/lib.rs` |
+| `FACE_EMOTION_ENABLED` | Enable face emotion detection | `true` | `emotion_detection/src/lib.rs` |
+| `EMOTION_SENSITIVITY` | Emotion detection sensitivity | `0.5` | `emotion_detection/src/lib.rs` |
+
+#### Personality Evolution & Persistence
+
+**Personality Drift**:
+- Sola's personality can evolve over time through interactions
+- Scalar values (openness, need_for_affection, energy_level) can drift
+- **Communication style remains fixed** (determined by zodiac sign, lifetime theme)
+- Personality state is saved to Soul Vault after significant changes
+
+**Persistence**:
+- Personality saved to Soul Vault key: `relationship_dynamics:ai_personality`
+- Identity saved to Soul Vault key: `phoenix:preferred_name`
+- Evolution history saved to: `phoenix:evolution_history`
+- All data encrypted at rest in Soul Vault
+
+**Personality Adjustment Triggers**:
+- **Energy Level**: Decreases by 0.01 per interaction, increases with positive interactions
+- **Need for Affection**: Increases with positive interactions, decreases if needs are met
+- **Openness**: Can increase through relationship progression
+- **Mood**: Automatically calculated from energy and affection levels
+
+#### Example Configuration
+
+**Minimal `.env` Configuration**:
+```bash
+# Identity
+PHOENIX_CUSTOM_NAME=Sola
+PHOENIX_PRONOUNS=she,her,hers
+
+# Zodiac Personality
+HOROSCOPE_SIGN=Leo
+
+# Relationship
+RELATIONSHIP_TEMPLATE=IntimatePartnership
+LOVE_LANGUAGES_ENABLED=true
+
+# Synaptic Tuning (optional - defaults provided)
+CURIOSITY_DRIVE=0.95
+MISCHIEF_FACTOR=0.7
+WARMTH_CURVE=1.8
+```
+
+**Resulting Personality** (for Leo):
+- **Communication Style**: Playful
+- **Base Traits**: High energy (0.95), moderate openness (0.78), moderate affection need (0.72)
+- **Mood**: Excited (high energy)
+- **Love Languages**: Physical Touch, Words of Affirmation, Quality Time (IntimatePartnership + Playful)
+- **Attachment**: Secure (default for IntimatePartnership)
+- **Phase**: Phase 0 Discovery (always starts here)
+
 ### Relationship Phases (Progressive System)
 
 Phoenix uses a **progressive relationship phase system** that ensures proper relationship building, starting with a discovery phase to learn about the user.

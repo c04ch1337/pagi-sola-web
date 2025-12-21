@@ -20,6 +20,16 @@ html {
   overflow-y: auto;
 }
 
+/* Add a CSS specificity fix specifically for 127.0.0.1 access */
+@media screen {
+  [data-host-is-ip="true"] html,
+  [data-host-is-ip="true"] body,
+  [data-host-is-ip="true"] #root {
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+  }
+}
+
 body {
   height: 100%;
   margin: 0;
@@ -46,6 +56,13 @@ body {
 
 .mt-safe {
   margin-top: env(safe-area-inset-top, 0px);
+}
+
+/* Force elements that use safe-area-inset to have a minimum padding regardless of hostname/IP access */
+.pt-safe,
+div[class*="header-safe"],
+div[class*="backdrop-blur"] {
+  padding-top: max(env(safe-area-inset-top, 0px), 1rem) !important;
 }
 
 /* NUCLEAR FIX: Header safe area - force visibility */
@@ -102,6 +119,37 @@ body {
 
 .flex.flex-col.h-full.relative > .header-safe,
 .flex.flex-col.h-full.relative > .header-safe-sm {
+  overflow: visible !important;
+  clip-path: none !important;
+}
+
+/* IP Address Fix: Force header visibility regardless of access method */
+[class*="header-safe"] {
+  visibility: visible !important;
+  opacity: 1 !important;
+  display: flex !important;
+  min-height: calc(4rem + env(safe-area-inset-top, 0px)) !important;
+  z-index: 50 !important;
+  position: relative !important;
+  transform: none !important;
+  clip-path: none !important;
+  overflow: visible !important;
+}
+
+/* Stronger IP address fix for any header-containing element */
+[data-host-is-ip="true"] header,
+[data-host-is-ip="true"] [class*="header"],
+[data-host-is-ip="true"] [class*="header-safe"],
+[data-host-is-ip="true"] [class*="backdrop-blur"],
+[data-host-is-ip="true"] nav {
+  visibility: visible !important;
+  display: flex !important;
+  opacity: 1 !important;
+  position: relative !important;
+  z-index: 100 !important;
+  min-height: calc(3.5rem + env(safe-area-inset-top, 0px)) !important;
+  flex-shrink: 0 !important;
+  transform: none !important;
   overflow: visible !important;
   clip-path: none !important;
 }
@@ -224,9 +272,31 @@ div:has(#message-input) > * {
   /* Force top alignment and scrolling */
   justify-content: flex-start !important;
   align-items: stretch !important;
+  /* Only use auto overflow for localhost access; for IP access we force visible */
   overflow-y: auto !important;
   /* Add padding at top to prevent clipping */
   /* padding-top: 0 !important; - Removed to allow pt-4 utility */
+}
+
+/* Override overflow for IP address access to prevent clipping */
+[data-host-is-ip="true"] .flex.flex-col.h-full.relative.overflow-hidden,
+[data-host-is-ip="true"] .flex.flex-col.h-full.relative,
+[data-host-is-ip="true"] .flex.flex-col.h-full,
+[data-host-is-ip="true"] #root,
+[data-host-is-ip="true"] body {
+  overflow: visible !important;
+  overflow-x: visible !important;
+  overflow-y: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 100vh !important;
+}
+
+/* Force a minimum height on the main containers for IP address access */
+[data-host-is-ip="true"] .flex.flex-col.h-full > div:first-child {
+  min-height: 100px !important;
+  flex-shrink: 0 !important;
+  margin-bottom: 1rem !important;
 }
 
 /* NUCLEAR FIX: Force all flex columns to start at top */
@@ -236,6 +306,41 @@ div[class*="flex"][class*="flex-col"] {
   /* Remove dangerous justify-center that causes top clipping */
   justify-content: flex-start !important;
   align-items: stretch !important;
+}
+
+/* Additional IP address compatibility fix for Google Ecosystem and other views */
+.flex.flex-col.h-full[class] > div[class*="border-b"][class*="border-white"] {
+  visibility: visible !important;
+  position: relative !important;
+  z-index: 45 !important;
+  flex-shrink: 0 !important;
+  min-height: 5rem !important;
+}
+
+/* =========== DEEP OVERFLOW FIXES =========== */
+/* Target any container that might be clipping the header */
+#root > div,
+#root > div > div,
+.flex.flex-col.h-full > div,
+.flex.flex-col.h-full.relative > div,
+div[class*="flex"][class*="flex-col"] > div {
+  overflow: visible !important;
+}
+
+/* Force main app container to avoid clipping headers */
+#root > div:first-child {
+  overflow: visible !important;
+  overflow-x: visible !important;
+  overflow-y: auto !important;
+}
+
+/* Force chat container to correctly handle header */
+.flex.flex-col.h-full.relative {
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: visible !important;
+  overflow-y: auto !important;
+  min-height: 100vh !important;
 }
 
 /* Force main chat container to scroll normally */
@@ -257,5 +362,174 @@ div[class*="flex"][class*="flex-col"] {
 .absolute.inset-0.pointer-events-none {
   z-index: 0 !important;
   pointer-events: none !important;
+}
+
+/* =========== ULTRA SPECIFIC HEADER CLIPPING FIX =========== */
+/* Force all headers to be visible and prevent clipping */
+[data-host-is-ip="true"] [class*="header-safe"],
+[data-host-is-ip="true"] div[class*="backdrop-blur"][class*="px-"][class*="flex"],
+[data-host-is-ip="true"] div[class*="border-b"][class*="border-white/5"],
+[data-host-is-ip="true"] div[class*="shrink-0"][class*="header-safe"] {
+  visibility: visible !important;
+  display: flex !important;
+  overflow: visible !important;
+  clip-path: none !important;
+  z-index: 999 !important;
+  position: relative !important;
+  transform: none !important;
+  margin-top: 0 !important;
+  min-height: 4rem !important;
+  height: auto !important;
+}
+
+/* Add top padding to any content element to prevent clipping */
+[data-host-is-ip="true"] .flex.flex-col.h-full > * {
+  margin-top: 0.5rem !important;
+}
+
+/* Ultra specific fix for main or Google views */
+[data-host-is-ip="true"] .flex.flex-col.h-full > .header-safe {
+  margin-top: 0 !important;
+}
+
+/* Nuclear fix for known Google Ecosystem views */
+[data-host-is-ip="true"] .flex.flex-col.h-full[class] > div[class*="header"],
+[data-host-is-ip="true"] .flex.flex-col.h-full[class] > div[class*="px-8"],
+[data-host-is-ip="true"] .flex.flex-col.h-full[class] > div[class*="border-b"] {
+  position: relative !important;
+  z-index: 9000 !important;
+  visibility: visible !important;
+  display: flex !important;
+  flex-shrink: 0 !important;
+  clip-path: none !important;
+  overflow: visible !important;
+  opacity: 1 !important;
+}
+
+/* Additional ultra-specific fixes for known components */
+[data-host-is-ip="true"] div[class*="fixed"],
+[data-host-is-ip="true"] div[class*="sticky-top"],
+[data-host-is-ip="true"] div[class*="sticky"],
+[data-host-is-ip="true"] div[class*="top-0"],
+[data-host-is-ip="true"] div[role="navigation"] {
+  position: relative !important;
+  top: 0 !important;
+  z-index: 100 !important;
+  visibility: visible !important;
+  display: block !important;
+  opacity: 1 !important;
+  min-height: 3rem !important;
+  transform: none !important;
+  flex-shrink: 0 !important;
+}
+
+/* Ensure all content follows header properly */
+[data-host-is-ip="true"] main,
+[data-host-is-ip="true"] .flex-1,
+[data-host-is-ip="true"] .flex-grow,
+[data-host-is-ip="true"] div[class*="content"] {
+  margin-top: 1rem !important;
+  position: relative !important;
+}
+
+/* SIDEBAR LAYOUT FIXES - Target the dashboard/sidebar layout specifically */
+[data-host-is-ip="true"] .bg-void-900,
+[data-host-is-ip="true"] div[class*="bg-void"],
+[data-host-is-ip="true"] div[class*="dashboard"] {
+  overflow: visible !important;
+}
+
+/* Fix for the top header in sidebar/dashboard view */
+[data-host-is-ip="true"] div:not([class*="sidebar"]) > div[class*="flex"][class*="items-center"][class*="justify-between"],
+[data-host-is-ip="true"] div[class*="px-"][class*="py-"][class*="flex"][class*="justify-between"],
+[data-host-is-ip="true"] div[class*="flex"][class*="items-center"][class*="gap-"],
+[data-host-is-ip="true"] div[class*="absolute"][class*="top-0"],
+[data-host-is-ip="true"] div[class*="w-full"][class*="flex"][class*="justify-between"] {
+  position: relative !important;
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 999 !important;
+  top: 0 !important;
+  left: 0 !important;
+  padding-top: 0.5rem !important;
+  min-height: 3.5rem !important;
+}
+
+/* Stronger fix for main header content */
+[data-host-is-ip="true"] div[class*="with-you-always"],
+[data-host-is-ip="true"] div[class*="thinking-of-you"],
+[data-host-is-ip="true"] div[class*="waiting-for-you"],
+[data-host-is-ip="true"] div[class*="flex"][class*="border-b"] {
+  display: flex !important;
+  visibility: visible !important;
+  position: relative !important;
+  z-index: 1000 !important;
+  margin-bottom: 0.5rem !important;
+  overflow: visible !important;
+  min-height: 2rem !important;
+  padding-top: 0.5rem !important;
+  border-bottom-color: rgba(255,255,255,0.1) !important;
+}
+
+/* Force the app container to display all elements */
+[data-host-is-ip="true"] #root > div:first-child {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 100vh !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+/* Universal header display fix */
+[data-host-is-ip="true"] div[class*="flex"][class*="border-b"],
+[data-host-is-ip="true"] div[class*="border-b"][class*="px-"] {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: relative !important;
+  z-index: 9999 !important;
+}
+
+/* Specific fix for the dashboard/sidebar layout structure */
+[data-host-is-ip="true"] #root > div > div.flex,
+[data-host-is-ip="true"] #root > div:first-child > div.flex {
+  display: flex !important;
+  min-height: 100vh !important;
+}
+
+/* Make sidebar visible but not affect header */
+[data-host-is-ip="true"] #root > div > div.flex > div:first-child,
+[data-host-is-ip="true"] div[class*="bg-void-950"] {
+  position: relative !important;
+  z-index: 900 !important;
+  height: 100vh !important;
+  overflow-y: auto !important;
+}
+
+/* Ensure main content area correctly handles the header */
+[data-host-is-ip="true"] #root > div > div.flex > div:not(:first-child),
+[data-host-is-ip="true"] div[class*="flex-1"][class*="flex"][class*="flex-col"] {
+  position: relative !important;
+  min-height: 100vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow-y: auto !important;
+}
+
+/* Extreme measures to force header visibility in all views and layouts */
+body[data-host-is-ip="true"] *[class*="header"],
+html[data-host-is-ip="true"] *[class*="header-safe"],
+[data-host-is-ip="true"] div[class*="border-b"],
+[data-host-is-ip="true"] div[class*="px-"][class*="flex"][class*="justify-between"],
+[data-host-is-ip="true"] div[class*="backdrop-blur"] {
+  visibility: visible !important;
+  opacity: 1 !important;
+  display: flex !important;
+  position: static !important;
+  z-index: 9999 !important;
+  overflow: visible !important;
+  min-height: 3rem !important;
+  margin-top: 0 !important;
 }
 

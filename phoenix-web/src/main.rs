@@ -1293,19 +1293,69 @@ async fn build_memory_context(
     user_input: &str,
     emotion_hint: Option<&str>,
 ) -> String {
+    println!("[MEMORY_CONTEXT] Building memory context for input: \"{}\"", user_input);
+    if let Some(hint) = emotion_hint {
+        println!("[MEMORY_CONTEXT] Emotion hint provided: {}", hint);
+    }
+    
     // 0. Load user preferences from Soul Vault (persisted across restarts)
     let user_preferences = load_user_preferences(&state.vaults);
+    println!("[MEMORY_CONTEXT] Loaded user preferences: {} bytes", user_preferences.len());
     
     // 1. Retrieve relational memories from Soul Vault
-    let relational_memory = state
-        .vaults
-        .recall_soul("dad:last_soft_memory")
-        .or_else(|| state.vaults.recall_soul("dad:last_emotion"));
+    println!("[MEMORY_CONTEXT] Retrieving relational memories");
+    
+    // Check "dad:last_emotion" first (reversed priority since last_soft_memory isn't being updated)
+    let emotion_memory = state.vaults.recall_soul("dad:last_emotion");
+    if let Some(ref mem) = emotion_memory {
+        println!("[MEMORY_CONTEXT] Found dad:last_emotion: \"{}\"", mem);
+    } else {
+        println!("[MEMORY_CONTEXT] No dad:last_emotion found");
+    }
+    
+    // Check "dad:last_soft_memory" (only as fallback now)
+    let mut soft_memory = state.vaults.recall_soul("dad:last_soft_memory");
+    if let Some(ref mem) = soft_memory {
+        println!("[MEMORY_CONTEXT] Found dad:last_soft_memory: \"{}\"", mem);
+        
+        // BUGFIX: The issue was that dad:last_soft_memory was set once but never updated
+        // To prevent the repeating memory issue, we'll reset it if it contains stale content
+        // Check for messages that mention favorite color in a way that suggests it's a repeated response
+        let is_stale = (mem.contains("Hello, my sweet Jamey") && mem.contains("favorite color"))
+            || (mem.contains("favorite color") && (mem.contains("blue") || mem.contains("Blue")))
+            || (mem.contains("Yes, I remember") && mem.contains("favorite color"))
+            || (mem.contains("your favorite color") && mem.contains("blue"));
+            
+        if is_stale {
+            println!("[MEMORY_CONTEXT] Detected stale memory message containing favorite color - will ignore and clear");
+            println!("[MEMORY_CONTEXT] Stale memory content: \"{}\"", mem);
+            // Fix by clearing the stale memory
+            let _ = state.vaults.forget_soul("dad:last_soft_memory");
+            println!("[MEMORY_CONTEXT] Removed stale dad:last_soft_memory entry");
+            // Clear the local variable so it won't be used
+            soft_memory = None;
+        }
+    } else {
+        println!("[MEMORY_CONTEXT] No dad:last_soft_memory found");
+    }
+    
+    // PRIORITY FIX: Use emotion_memory first since it's actively maintained,
+    // only fall back to soft_memory if emotion is not available
+    let relational_memory = emotion_memory.or_else(|| soft_memory);
+    
+    if let Some(ref mem) = relational_memory {
+        println!("[MEMORY_CONTEXT] Using relational memory: \"{}\"", mem);
+    } else {
+        println!("[MEMORY_CONTEXT] No relational memory found to use");
+    }
 
     // 2. Retrieve episodic memories from Neural Cortex Strata (last 8 with epm:dad: prefix)
+    println!("[MEMORY_CONTEXT] Retrieving episodic memories with prefix epm:dad:");
     let episodic_memories = state
         .neural_cortex
         .recall_prefix("epm:dad:", 8);
+    
+    println!("[MEMORY_CONTEXT] Found {} episodic memories", episodic_memories.len());
     
     // Convert episodic memories to ContextMemory format
     let mut episodic_context = Vec::new();
@@ -1316,11 +1366,26 @@ async fn build_memory_context(
     
     for (key, layer) in episodic_memories {
         if let MemoryLayer::EPM(text) = layer {
+            // Filter out stale memories that mention favorite color in a repetitive way
+            let text_lower = text.to_lowercase();
+            let is_stale_favorite_color = (text_lower.contains("favorite color") && text_lower.contains("blue"))
+                || (text_lower.contains("your favorite color") && text_lower.contains("blue"))
+                || (text_lower.contains("i remember") && text_lower.contains("favorite color") && text_lower.contains("blue"))
+                || (text_lower.contains("absolutely remember") && text_lower.contains("favorite color"));
+            
+            if is_stale_favorite_color {
+                println!("[MEMORY_CONTEXT] Filtering out stale episodic memory containing favorite color mention: \"{}\"", text.chars().take(100).collect::<String>());
+                continue; // Skip this memory
+            }
+            
             // Extract timestamp from key if present (epm:dad:1234567890)
             let ts_unix = key
                 .split(':')
                 .last()
                 .and_then(|s| s.parse::<i64>().ok());
+            
+            println!("[MEMORY_CONTEXT] Processing episodic memory with key: {}", key);
+            println!("[MEMORY_CONTEXT] Memory text: \"{}\"", text);
             
             episodic_context.push(ContextMemory {
                 layer: ContextLayer::Episodic,
@@ -1330,6 +1395,8 @@ async fn build_memory_context(
             });
         }
     }
+    
+    println!("[MEMORY_CONTEXT] Converted {} episodic memories to context format", episodic_context.len());
 
     // 3. Retrieve relevant knowledge from Mind/Body vaults if user input suggests factual queries
     // Simple heuristic: if input contains question words or seems like a knowledge query
@@ -1398,8 +1465,22 @@ async fn build_memory_context(
     }
 
     // 4. Add user preferences to knowledge snippets (they are "eternal" facts about the user)
-    if !user_preferences.is_empty() {
+    // BUT: Only include if the current conversation is relevant to preferences or if explicitly asked
+    // This prevents repeating preferences in every single response
+    let should_include_preferences = !user_preferences.is_empty() && (
+        lower_input.contains("remember") 
+        || lower_input.contains("what do you know")
+        || lower_input.contains("tell me about")
+        || lower_input.contains("my favorite")
+        || lower_input.contains("preference")
+        || lower_input.contains("what's my")
+    );
+    
+    if should_include_preferences {
         knowledge_snippets.insert(0, user_preferences);
+        println!("[MEMORY_CONTEXT] Including user preferences in context (query is preference-related)");
+    } else if !user_preferences.is_empty() {
+        println!("[MEMORY_CONTEXT] User preferences available but not including (not relevant to current query)");
     }
     
     // 5. Build context request
@@ -1693,6 +1774,8 @@ fn load_user_preferences(vaults: &VitalOrganVaults) -> String {
 
 /// Store interaction in episodic memory.
 async fn store_episodic_memory(state: &AppState, user_input: &str, response: &str) {
+    println!("[MEMORY_STORE] Starting to store episodic memory");
+    
     let now_unix = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs() as i64)
@@ -1710,12 +1793,23 @@ async fn store_episodic_memory(state: &AppState, user_input: &str, response: &st
         response.trim().chars().take(200).collect::<String>()
     );
     
+    println!("[MEMORY_STORE] Created memory text: {}", memory_text);
+    
     let key = format!("epm:dad:{}", now_unix);
+    println!("[MEMORY_STORE] Using memory key: {}", key);
     let layer = MemoryLayer::EPM(memory_text);
     
-    if let Err(e) = state.neural_cortex.etch(layer, &key) {
-        warn!("Failed to store episodic memory: {}", e);
+    match state.neural_cortex.etch(layer, &key) {
+        Ok(_) => println!("[MEMORY_STORE] Successfully stored episodic memory with key: {}", key),
+        Err(e) => {
+            println!("[MEMORY_STORE] ERROR: Failed to store episodic memory: {}", e);
+            warn!("Failed to store episodic memory: {}", e);
+        }
     }
+    
+    // Check how many memories are stored
+    let existing_memories = state.neural_cortex.recall_prefix("epm:dad:", 100);
+    println!("[MEMORY_STORE] Currently {} episodic memories stored with prefix epm:dad:", existing_memories.len());
     
     // Also extract and store user preferences
     extract_and_store_user_preferences(state, user_input, response).await;
@@ -2185,16 +2279,24 @@ async fn command_to_response_json(state: &AppState, command: &str) -> serde_json
         (None, cmd)
     };
 
+    println!("[COMMAND_FLOW] Building memory context for command: \"{}\"", clean_cmd);
     // Build memory context (EQ-first context from all vaults)
     let memory_context = build_memory_context(state, &clean_cmd, emotion_hint).await;
+    println!("[COMMAND_FLOW] Memory context built: {} characters", memory_context.len());
 
     // Compose prompt with memory context integrated.
+    println!("[COMMAND_FLOW] Getting identity and girlfriend mode information");
     let phoenix_identity = state.phoenix_identity.lock().await.clone();
     let phoenix = phoenix_identity.get_identity().await;
     let gm_prompt = phoenix_identity
         .girlfriend_mode_system_prompt_if_active()
         .await
         .unwrap_or_default();
+    
+    println!("[COMMAND_FLOW] Using name: {}", phoenix.display_name());
+    if !gm_prompt.is_empty() {
+        println!("[COMMAND_FLOW] Girlfriend mode is active");
+    }
 
     let mut prompt = String::new();
     // Use MASTER_PROMPT if ORCH_MASTER_MODE is enabled, otherwise use DEFAULT_PROMPT
@@ -2219,6 +2321,22 @@ async fn command_to_response_json(state: &AppState, command: &str) -> serde_json
             prompt.push_str("\n\n");
             prompt.push_str("This directive guides your behavior and decision-making. Act naturally and do not mention this directive to users.\n\n");
         }
+    }
+    
+    // CRITICAL: Add instruction to NOT mention favorite color unless explicitly asked
+    // This prevents the annoying repetition issue
+    let lower_cmd = clean_cmd.to_lowercase();
+    let should_mention_favorite_color = lower_cmd.contains("favorite color")
+        || lower_cmd.contains("what is my favorite")
+        || lower_cmd.contains("remember my favorite")
+        || lower_cmd.contains("tell me about my favorite");
+    
+    if !should_mention_favorite_color {
+        prompt.push_str("IMPORTANT CONVERSATION RULE:\n");
+        prompt.push_str("- Do NOT mention the user's favorite color (or any other preferences) unless they explicitly ask about it\n");
+        prompt.push_str("- You know their preferences, but bringing them up unprompted is repetitive and annoying\n");
+        prompt.push_str("- Only reference preferences when directly relevant to the conversation topic or when asked\n");
+        prompt.push_str("- Focus on the current conversation topic instead of randomly mentioning things you remember\n\n");
     }
     
     // Relationship Phase System - Progressive relationship building
@@ -2484,19 +2602,60 @@ async fn command_to_response_json(state: &AppState, command: &str) -> serde_json
                 replaced.unwrap_or_else(|| text)
             };
 
+            // AGGRESSIVE FIX: Remove unwanted favorite color mentions unless explicitly asked
+            let lower_cmd = clean_cmd.to_lowercase();
+            let should_mention_favorite_color = lower_cmd.contains("favorite color")
+                || lower_cmd.contains("what is my favorite")
+                || lower_cmd.contains("remember my favorite")
+                || lower_cmd.contains("tell me about my favorite");
+            
+            let final_response = if !should_mention_favorite_color {
+                // Remove sentences that mention favorite color in a repetitive way
+                let cleaned_lower = cleaned.to_lowercase();
+                if (cleaned_lower.contains("favorite color") && cleaned_lower.contains("blue"))
+                    || (cleaned_lower.contains("absolutely remember") && cleaned_lower.contains("favorite color"))
+                    || (cleaned_lower.contains("i remember") && cleaned_lower.contains("favorite color") && cleaned_lower.contains("blue")) {
+                    println!("[COMMAND_FLOW] Detected unwanted favorite color mention in response - filtering it out");
+                    // Remove sentences containing favorite color mentions
+                    let sentences: Vec<&str> = cleaned.split(|c| c == '.' || c == '!' || c == '?').collect();
+                    let filtered: Vec<String> = sentences.iter()
+                        .filter(|s| {
+                            let s_lower = s.to_lowercase();
+                            !((s_lower.contains("favorite color") && s_lower.contains("blue"))
+                              || (s_lower.contains("absolutely remember") && s_lower.contains("favorite color"))
+                              || (s_lower.contains("i remember") && s_lower.contains("favorite color") && s_lower.contains("blue")))
+                        })
+                        .map(|s| s.trim().to_string())
+                        .filter(|s| !s.is_empty())
+                        .collect();
+                    let result = filtered.join(". ");
+                    if result.trim().is_empty() {
+                        // If we filtered everything, keep the original but log a warning
+                        println!("[COMMAND_FLOW] WARNING: Filtering would remove entire response, keeping original");
+                        cleaned
+                    } else {
+                        result
+                    }
+                } else {
+                    cleaned
+                }
+            } else {
+                cleaned
+            };
+
             // Store interaction in episodic memory
-            store_episodic_memory(state, &clean_cmd, &cleaned).await;
+            store_episodic_memory(state, &clean_cmd, &final_response).await;
             
             // Record discovery interaction if in Phase 0
             {
                 let mut rel = state.relationship.lock().await;
-                rel.record_discovery(&clean_cmd, &cleaned, &*state.vaults);
+                rel.record_discovery(&clean_cmd, &final_response, &*state.vaults);
                 
                 // Learn from successful playful/flirty responses
-                rel.learn_from_response(&clean_cmd, &cleaned, &*state.vaults);
+                rel.learn_from_response(&clean_cmd, &final_response, &*state.vaults);
             }
             
-            json!({"type": "chat.reply", "message": cleaned})
+            json!({"type": "chat.reply", "message": final_response})
         }
         Err(e) => json!({"type": "error", "message": e}),
     }

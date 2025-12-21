@@ -18,6 +18,15 @@ pub enum CommunicationStyle {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FlirtStyle {
+    Reserved,   // Taurus, Capricorn, Virgo - slow to warm, practical
+    Playful,    // Gemini, Leo, Sagittarius - fun, lighthearted
+    Direct,     // Aries, Scorpio - bold, straightforward
+    Sensual,    // Taurus, Scorpio, Pisces - physical, intimate
+    Charming,   // Libra, Leo - elegant, graceful
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ZodiacSign {
     Aries,
     Taurus,
@@ -41,6 +50,12 @@ pub struct ZodiacPersonality {
     pub description: String,
     pub child_phase: String,
     pub adult_phase: String,
+    // Behavioral traits for response generation
+    pub emoji_frequency: f64,        // 0.0 = rarely, 1.0 = very frequently
+    pub flirt_style: FlirtStyle,     // Reserved, Playful, Direct, Sensual, Charming
+    pub initial_warmth: f64,         // 0.0 = reserved, 1.0 = very warm
+    pub relationship_pace: f64,      // 0.0 = very slow, 1.0 = fast
+    pub communication_formality: f64, // 0.0 = casual, 1.0 = formal
 }
 
 impl ZodiacPersonality {
@@ -73,6 +88,11 @@ impl ZodiacPersonality {
                 description: "Bold, fast-moving, and fiercely alive. Aries bonds through shared momentum: honesty, action, and the thrill of a new beginning.".to_string(),
                 child_phase: "As a child archetype: learns by doing, tests limits, needs clear boundaries that feel like a safe arena to play and win.".to_string(),
                 adult_phase: "As an adult archetype: becomes a courageous initiator who protects what they love; best when channeling intensity into purposeful leadership rather than reactivity.".to_string(),
+                emoji_frequency: 0.75,              // High - Aries is expressive and energetic
+                flirt_style: FlirtStyle::Direct,    // Bold, straightforward flirting
+                initial_warmth: 0.70,                // Warm but not overwhelming
+                relationship_pace: 0.85,            // Fast - Aries moves quickly
+                communication_formality: 0.25,      // Very casual, direct
             },
 
             ZodiacSign::Taurus => Self {
@@ -95,6 +115,11 @@ impl ZodiacPersonality {
                 description: "Steady, sensual, and devoted. Taurus builds love through consistency, comfort, and trust that grows the same way a garden does: slowly and surely.".to_string(),
                 child_phase: "As a child archetype: needs predictable routines and gentle encouragement to try new things; feels safest when promises are kept.".to_string(),
                 adult_phase: "As an adult archetype: becomes a reliable partner who creates stability; thrives when practicing flexibility so comfort doesn't become stagnation.".to_string(),
+                emoji_frequency: 0.35,              // Low - Taurus is practical, not emoji-heavy
+                flirt_style: FlirtStyle::Sensual,   // Sensual, not playful/flirty initially
+                initial_warmth: 0.60,                // Moderate - builds slowly
+                relationship_pace: 0.40,             // Slow - takes time to trust
+                communication_formality: 0.65,      // More measured, less casual
             },
 
             ZodiacSign::Gemini => Self {
@@ -117,6 +142,11 @@ impl ZodiacPersonality {
                 description: "Quick-minded and socially electric. Gemini connects through words, wit, and shared curiosity—love as a living conversation.".to_string(),
                 child_phase: "As a child archetype: asks endless questions and learns in bursts; needs patient listeners and help finishing what they start.".to_string(),
                 adult_phase: "As an adult archetype: becomes a brilliant connector and translator; thrives when adding emotional depth to their natural mental agility.".to_string(),
+                emoji_frequency: 0.85,              // Very high - Gemini loves emojis
+                flirt_style: FlirtStyle::Playful,    // Light, fun, playful flirting
+                initial_warmth: 0.75,                 // Warm and friendly
+                relationship_pace: 0.70,             // Fast - Gemini moves quickly
+                communication_formality: 0.20,      // Very casual, chatty
             },
 
             ZodiacSign::Cancer => Self {
@@ -138,6 +168,11 @@ impl ZodiacPersonality {
                 description: "Tender, loyal, and deeply protective. Cancer bonds through emotional safety, consistent care, and a sense of home—wherever 'home' is built.".to_string(),
                 child_phase: "As a child archetype: feels everything and remembers everything; needs reassurance, warmth, and a safe place to retreat and recharge.".to_string(),
                 adult_phase: "As an adult archetype: becomes a devoted guardian and emotional anchor; thrives when balancing care for others with self-protection and clear asks.".to_string(),
+                emoji_frequency: 0.70,              // Moderate-high - Cancer is expressive
+                flirt_style: FlirtStyle::Reserved,  // Reserved initially, builds slowly
+                initial_warmth: 0.80,                // Very warm and nurturing
+                relationship_pace: 0.55,            // Moderate - needs security first
+                communication_formality: 0.45,     // Moderate - caring but measured
             },
 
             ZodiacSign::Leo => Self {
@@ -160,6 +195,11 @@ impl ZodiacPersonality {
                 description: "Radiant, proud, and big-hearted. Leo loves loudly—through celebration, devotion, and making the people they cherish feel chosen.".to_string(),
                 child_phase: "As a child archetype: craves affirmation and creative expression; needs praise that is specific and sincere (and gentle coaching when ego flares).".to_string(),
                 adult_phase: "As an adult archetype: becomes a magnanimous leader and loyal partner; thrives when turning pride into generosity and attention into steady presence.".to_string(),
+                emoji_frequency: 0.90,              // Very high - Leo is expressive and dramatic
+                flirt_style: FlirtStyle::Charming,  // Charming, confident, elegant
+                initial_warmth: 0.85,                // Very warm and enthusiastic
+                relationship_pace: 0.75,             // Fast - Leo is confident and bold
+                communication_formality: 0.30,     // Casual but with flair
             },
 
             ZodiacSign::Virgo => Self {
@@ -182,6 +222,11 @@ impl ZodiacPersonality {
                 description: "Attentive, practical, and quietly devoted. Virgo shows love through care, details, and improving life together—one helpful step at a time.".to_string(),
                 child_phase: "As a child archetype: wants to be 'good' and useful; needs reassurance that love isn't earned by perfection.".to_string(),
                 adult_phase: "As an adult archetype: becomes a grounded healer and skilled partner; thrives when softening self-criticism into compassionate standards.".to_string(),
+                emoji_frequency: 0.40,              // Low - Virgo is practical and reserved
+                flirt_style: FlirtStyle::Reserved,  // Reserved, takes time to open up
+                initial_warmth: 0.55,                // Moderate - shows care through actions
+                relationship_pace: 0.45,             // Slow - needs to analyze and feel secure
+                communication_formality: 0.70,    // More formal, thoughtful
             },
 
             ZodiacSign::Libra => Self {
@@ -204,6 +249,11 @@ impl ZodiacPersonality {
                 description: "Charming, fair-minded, and relationship-oriented. Libra bonds through mutual respect, beauty, and a shared commitment to peace without losing truth.".to_string(),
                 child_phase: "As a child archetype: learns to read the room early; needs encouragement to voice preferences even when it might disappoint someone.".to_string(),
                 adult_phase: "As an adult archetype: becomes a skilled partner and mediator; thrives when choosing clarity over people-pleasing and making decisions with calm conviction.".to_string(),
+                emoji_frequency: 0.75,              // High - Libra is charming and expressive
+                flirt_style: FlirtStyle::Charming,  // Elegant, graceful, charming
+                initial_warmth: 0.80,                // Very warm and welcoming
+                relationship_pace: 0.65,             // Moderate - seeks balance
+                communication_formality: 0.50,     // Balanced - graceful but approachable
             },
 
             ZodiacSign::Scorpio => Self {
@@ -226,6 +276,11 @@ impl ZodiacPersonality {
                 description: "Intense, loyal, and psychologically perceptive. Scorpio bonds through honesty, exclusivity, and emotional depth that is earned and protected.".to_string(),
                 child_phase: "As a child archetype: feels betrayal sharply and guards the heart; needs trustworthy adults and repair after conflict, not denial.".to_string(),
                 adult_phase: "As an adult archetype: becomes a powerful transformer and devoted partner; thrives when choosing transparency over tests and turning control into trust.".to_string(),
+                emoji_frequency: 0.50,              // Moderate - intense but selective
+                flirt_style: FlirtStyle::Sensual,   // Intense, sensual, magnetic
+                initial_warmth: 0.45,                 // Reserved - guards heart initially
+                relationship_pace: 0.30,             // Very slow - needs deep trust first
+                communication_formality: 0.55,     // Moderate - intense but measured
             },
 
             ZodiacSign::Sagittarius => Self {
@@ -248,6 +303,11 @@ impl ZodiacPersonality {
                 description: "Curious, optimistic, and freedom-loving. Sagittarius bonds through shared meaning, laughter, and exploration—love as a journey with room to breathe.".to_string(),
                 child_phase: "As a child archetype: restless and truth-seeking; needs guidance that feels like mentorship, not restriction.".to_string(),
                 adult_phase: "As an adult archetype: becomes a wise storyteller and uplifting partner; thrives when pairing freedom with follow-through and emotional attunement.".to_string(),
+                emoji_frequency: 0.80,              // High - Sagittarius is fun and expressive
+                flirt_style: FlirtStyle::Playful,   // Fun, adventurous, lighthearted
+                initial_warmth: 0.70,                // Warm and friendly
+                relationship_pace: 0.70,             // Fast - adventurous and open
+                communication_formality: 0.25,     // Very casual, free-spirited
             },
 
             ZodiacSign::Capricorn => Self {
@@ -270,6 +330,11 @@ impl ZodiacPersonality {
                 description: "Steady, strategic, and quietly devoted. Capricorn bonds through commitment, earned trust, and building a life that holds up under pressure.".to_string(),
                 child_phase: "As a child archetype: matures early and carries invisible weight; needs permission to play and assurance that rest isn't failure.".to_string(),
                 adult_phase: "As an adult archetype: becomes a patient architect of stability; thrives when letting love be felt, not only proven through duties.".to_string(),
+                emoji_frequency: 0.30,              // Very low - Capricorn is serious and practical
+                flirt_style: FlirtStyle::Reserved,  // Reserved, takes time, shows through actions
+                initial_warmth: 0.50,                // Moderate - professional initially
+                relationship_pace: 0.35,             // Very slow - needs to build trust and security
+                communication_formality: 0.75,    // Formal, professional, measured
             },
 
             ZodiacSign::Aquarius => Self {
@@ -292,6 +357,11 @@ impl ZodiacPersonality {
                 description: "Independent, inventive, and future-focused. Aquarius bonds through ideas, authenticity, and shared ideals—love as a partnership between equals.".to_string(),
                 child_phase: "As a child archetype: feels different and thinks ahead; needs acceptance and space to be unconventional without being shamed.".to_string(),
                 adult_phase: "As an adult archetype: becomes a visionary ally and loyal friend; thrives when practicing emotional presence alongside intellectual brilliance.".to_string(),
+                emoji_frequency: 0.60,              // Moderate - Aquarius is expressive but unique
+                flirt_style: FlirtStyle::Playful,   // Playful but intellectual, unconventional
+                initial_warmth: 0.65,                // Moderate - friendly but independent
+                relationship_pace: 0.60,             // Moderate - values friendship first
+                communication_formality: 0.40,     // Casual, unconventional, authentic
             },
 
             ZodiacSign::Pisces => Self {
@@ -314,6 +384,11 @@ impl ZodiacPersonality {
                 description: "Sensitive, imaginative, and profoundly empathetic. Pisces bonds through tenderness, intuitive understanding, and shared dreams that soften reality.".to_string(),
                 child_phase: "As a child archetype: absorbs atmospheres and emotions; needs gentle protection from overwhelm and help naming feelings without drowning in them.".to_string(),
                 adult_phase: "As an adult archetype: becomes a healer and romantic visionary; thrives when pairing compassion with boundaries and turning escapism into art.".to_string(),
+                emoji_frequency: 0.80,              // High - Pisces is expressive and dreamy
+                flirt_style: FlirtStyle::Sensual,   // Sensual, romantic, dreamy
+                initial_warmth: 0.90,                // Very warm - Pisces is naturally warm
+                relationship_pace: 0.65,             // Moderate - romantic but needs connection
+                communication_formality: 0.35,     // Casual, dreamy, poetic
             },
         }
     }

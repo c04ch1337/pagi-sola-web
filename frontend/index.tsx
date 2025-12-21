@@ -1,6 +1,37 @@
 import './styles.css';
 import React, { useState, useEffect, useRef, useMemo, useCallback, createContext, useContext } from 'react';
 import { createRoot } from 'react-dom/client';
+
+// Enhanced detection of IP address access
+const detectIpAccess = () => {
+  // IP v4 pattern - matches standard and non-standard IP forms
+  const isIpAddress =
+    /^(\d{1,3}\.){3}\d{1,3}$/.test(window.location.hostname) ||
+    window.location.hostname === '127.0.0.1';
+  
+  if (isIpAddress) {
+    document.documentElement.setAttribute('data-host-is-ip', 'true');
+    console.log('Phoenix UI: IP address access detected, applying compatibility fixes');
+  }
+};
+
+// Run detection immediately
+detectIpAccess();
+
+// Also run again after a small delay to ensure it works even if rendering is deferred
+setTimeout(detectIpAccess, 100);
+
+// Set up a MutationObserver to ensure IP detection persists through any DOM changes
+if (typeof MutationObserver !== 'undefined') {
+  const observer = new MutationObserver(() => {
+    if (!document.documentElement.hasAttribute('data-host-is-ip') &&
+        (/^(\d{1,3}\.){3}\d{1,3}$/.test(window.location.hostname) || window.location.hostname === '127.0.0.1')) {
+      document.documentElement.setAttribute('data-host-is-ip', 'true');
+    }
+  });
+  
+  observer.observe(document, { subtree: true, childList: true });
+}
 import { DevToolsView } from './devtools';
 import {
   MessageSquare, Heart, Settings, Activity, Zap, Send, Menu, X,
@@ -500,19 +531,24 @@ class PhoenixBackendService {
 
   async sendCommand(command: string): Promise<string> {
     try {
-      const res = await fetch(this.url('/api/command'), {
+      const url = this.url('/api/command');
+      console.log('[PhoenixBackendService] Sending command to:', url, 'Command:', command);
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ command })
       });
       const text = await res.text();
+      console.log('[PhoenixBackendService] Response status:', res.status, 'Response text length:', text.length);
       if (!res.ok) {
         console.error(`API error: ${res.status}`, text);
         return JSON.stringify({ type: 'error', message: `Backend error: ${res.status} ${text}` });
       }
       // The backend returns JSON (string). Preserve as-is so callers can JSON.parse if desired.
+      console.log('[PhoenixBackendService] Response preview:', text.substring(0, 200));
       return text;
     } catch (e: any) {
+      console.error('[PhoenixBackendService] Request failed:', e);
       return JSON.stringify({ type: 'error', message: `Backend offline: ${e?.message || String(e)}` });
     }
   }
@@ -663,13 +699,20 @@ const PhoenixProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
   useEffect(() => {
     const checkStatus = async () => {
-      const status = await phoenixService.status();
-      setIsConnected(status.status === 'online');
+      try {
+        const status = await phoenixService.status();
+        console.log('[PhoenixProvider] Status check:', status);
+        setIsConnected(status.status === 'online');
+      } catch (e) {
+        console.error('[PhoenixProvider] Status check failed:', e);
+        setIsConnected(false);
+      }
     };
 
     const fetchName = async () => {
       try {
         const name = await phoenixService.getPhoenixName();
+        console.log('[PhoenixProvider] Phoenix name:', name);
         setPhoenixName(name);
       } catch (e) {
         console.error("Failed to get Phoenix name", e);
@@ -677,7 +720,9 @@ const PhoenixProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
     };
 
     // Seed UI with any existing local history once (avoid wiping chat on each status poll).
-    setMessages([...phoenixService.getHistory()]);
+    const history = phoenixService.getHistory();
+    console.log('[PhoenixProvider] Initializing with history:', history.length, 'messages');
+    setMessages([...history]);
 
     checkStatus();
     fetchName();
@@ -686,6 +731,7 @@ const PhoenixProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
   }, []);  // No dependencies needed as these are initialization functions
 
   const sendMessage = async (text: string) => {
+    console.log('[PhoenixProvider] sendMessage called with:', text);
     const msgTime = Date.now();
     const userMsg: Message = { id: `usr-${msgTime}`, role: 'user', content: text, timestamp: msgTime };
     
@@ -694,21 +740,26 @@ const PhoenixProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
     
     // Use functional state update for React state safety
     setMessages(prev => [...prev, userMsg]);
+    console.log('[PhoenixProvider] User message added, current message count:', messages.length + 1);
     
     try {
+      console.log('[PhoenixProvider] Calling sendCommand...');
       const responseText = await phoenixService.sendCommand(text);
+      console.log('[PhoenixProvider] Received response, length:', responseText.length);
       let displayContent = responseText;
       try {
         const json = JSON.parse(responseText);
+        console.log('[PhoenixProvider] Parsed JSON response:', json.type, 'has message:', !!json.message);
         if (json.message) displayContent = json.message;
         else if (json.data) displayContent = "Received structured data from backend.";
       } catch (e) {
-        console.log("Response is not JSON or has invalid format", e);
+        console.log("[PhoenixProvider] Response is not JSON or has invalid format", e, "Raw response:", responseText.substring(0, 100));
       }
 
       // Normalize legacy speaker tags that some prompts/models return.
       // We keep the tag (for users who like it) but ensure it never says "Phoenix:".
       displayContent = displayContent.replace(/^(phoenix|pheonix)\s*:\s*/i, 'Sola: ');
+      console.log('[PhoenixProvider] Final display content length:', displayContent.length);
       
       const responseTime = Date.now();
       const aiMsg: Message = { id: `ai-${responseTime}`, role: 'assistant', content: displayContent, timestamp: responseTime };
@@ -716,9 +767,13 @@ const PhoenixProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
       phoenixService.appendToHistory(aiMsg);
       
       // Use functional state update for React state safety
-      setMessages(prev => [...prev, aiMsg]);
+      setMessages(prev => {
+        const updated = [...prev, aiMsg];
+        console.log('[PhoenixProvider] AI message added, total messages:', updated.length);
+        return updated;
+      });
     } catch (e) {
-      console.error("Failed to send message:", e);
+      console.error("[PhoenixProvider] Failed to send message:", e);
     }
   };
 
@@ -3857,6 +3912,14 @@ const DashboardLayout = () => {
 // Mount
 const rootElement = document.getElementById('root');
 if (rootElement) {
+  // Check if host is numeric IP address by checking for IPv4 pattern
+  const isIpAddress = /^[0-9.]+$/.test(window.location.hostname);
+  
+  // Add data attribute to document to support our IP-specific CSS
+  if (isIpAddress) {
+    document.documentElement.setAttribute('data-host-is-ip', 'true');
+  }
+
   const root = createRoot(rootElement);
   root.render(
     <PhoenixProvider>

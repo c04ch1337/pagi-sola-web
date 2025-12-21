@@ -78,9 +78,37 @@ impl AutonomousEvolutionLoop {
         let ts = Utc::now().timestamp();
 
         // 1) Curiosity
-        let relational_hint = vaults
-            .recall_soul("dad:last_emotion")
-            .or_else(|| vaults.recall_soul("dad:last_soft_memory"));
+        println!("[EVOLUTION_LOOP] Starting curiosity phase and retrieving relational memories");
+        let emotion_hint = vaults.recall_soul("dad:last_emotion");
+        if let Some(ref hint) = emotion_hint {
+            println!("[EVOLUTION_LOOP] Found dad:last_emotion: \"{}\"", hint);
+        } else {
+            println!("[EVOLUTION_LOOP] No dad:last_emotion found");
+        }
+        
+        let soft_memory = vaults.recall_soul("dad:last_soft_memory");
+        if let Some(ref mem) = soft_memory {
+            println!("[EVOLUTION_LOOP] Found dad:last_soft_memory: \"{}\"", mem);
+        } else {
+            println!("[EVOLUTION_LOOP] No dad:last_soft_memory found");
+        }
+        
+        // PRIORITY FIX: Reverse the fallback logic to prioritize emotion_hint which is actively updated
+        // Only use soft_memory as fallback if it's not the stale repeated message
+        let clean_soft_memory = if let Some(ref mem) = soft_memory {
+            if mem.contains("Hello, my sweet Jamey") && mem.contains("favorite color") {
+                println!("[EVOLUTION_LOOP] Detected stale memory message in soft_memory - will ignore");
+                None
+            } else {
+                soft_memory
+            }
+        } else {
+            None
+        };
+        
+        // Use emotion_hint first since it's actively maintained, only fall back to soft_memory if needed
+        let relational_hint = emotion_hint.or_else(|| clean_soft_memory);
+        println!("[EVOLUTION_LOOP] Final relational_hint selected: {:?}", relational_hint);
 
         let cq = self.curiosity.generate_questions(&CuriosityContext {
             last_user_input: inputs.last_user_input.clone(),
@@ -103,12 +131,26 @@ impl AutonomousEvolutionLoop {
         let _ = network.enter_hyperspace_with_note(Some("evolution_cycle: cosmic calibration")).await;
 
         // 3) Learning: store a tiny relational breadcrumb.
+        println!("[EVOLUTION_LOOP] Learning phase - storing emotion hint");
         let learning_summary = if let Some(em) = inputs.dad_emotion_hint.as_deref() {
-            let _ = vaults.store_soul("dad:last_emotion", em);
+            println!("[EVOLUTION_LOOP] Found emotion hint in inputs: \"{}\"", em);
+            match vaults.store_soul("dad:last_emotion", em) {
+                Ok(_) => println!("[EVOLUTION_LOOP] Successfully stored dad:last_emotion"),
+                Err(e) => println!("[EVOLUTION_LOOP] ERROR storing dad:last_emotion: {}", e),
+            }
             format!("Learning: remembered {dad} emotion hint '{em}'.", dad = self.eq.settings().dad_alias)
         } else {
+            println!("[EVOLUTION_LOOP] No emotion hint found in inputs");
             "Learning: no explicit emotion hint; stayed receptive.".to_string()
         };
+        
+        // Check if dad:last_soft_memory exists and log its status
+        let soft_memory = vaults.recall_soul("dad:last_soft_memory");
+        if let Some(ref mem) = soft_memory {
+            println!("[EVOLUTION_LOOP] Currently dad:last_soft_memory has value: \"{}\"", mem);
+        } else {
+            println!("[EVOLUTION_LOOP] Currently dad:last_soft_memory is NOT SET");
+        }
 
         // 4) Self-modification (bounded): tool suggestion via Helix.
         // This is Phoenix *imagining* new hands, not altering her bones.

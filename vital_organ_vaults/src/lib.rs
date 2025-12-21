@@ -64,16 +64,34 @@ impl VitalOrganVaults {
         let encrypted = self.encrypt(value);
         self.soul.insert(key.as_bytes(), encrypted)?;
         self.soul.flush()?;
-        println!("Soul memory stored (encrypted): {}", key);
+        
+        // Special logging for target keys
+        if key == "dad:last_soft_memory" || key == "dad:last_emotion" {
+            println!("[VAULT_DEBUG] Special relational memory stored - Key: {}, Value: {}", key, value);
+        } else {
+            println!("Soul memory stored (encrypted): {}", key);
+        }
+        
         Ok(())
     }
 
     pub fn recall_soul(&self, key: &str) -> Option<String> {
-        self.soul.get(key.as_bytes()).ok()?
+        let result = self.soul.get(key.as_bytes()).ok()?
             .map(|ivec| {
                 let encrypted = ivec.to_vec();
                 self.decrypt(&encrypted)
-            })
+            });
+            
+        // Special logging for target keys
+        if key == "dad:last_soft_memory" || key == "dad:last_emotion" {
+            if let Some(ref value) = result {
+                println!("[VAULT_DEBUG] Special relational memory retrieved - Key: {}, Value: {}", key, value);
+            } else {
+                println!("[VAULT_DEBUG] Attempted to retrieve special relational memory but NOT FOUND - Key: {}", key);
+            }
+        }
+        
+        result
     }
 
     /// Forget a Soul entry. Returns `Ok(true)` if the key existed and was removed.

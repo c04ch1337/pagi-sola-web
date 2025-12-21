@@ -299,43 +299,141 @@ impl Partnership {
                 let user_birthday = soul.recall_private(SOUL_KEY_USER_BIRTHDAY);
                 let has_chart = soul.recall_private(SOUL_KEY_USER_ASTROLOGICAL_CHART).is_some();
                 
+                // Check for known user preferences to avoid asking about things we already know
+                let favorite_color = soul.recall_private("user:preference:favorite_color");
+                let favorite_food = soul.recall_private("user:preference:favorite_food");
+                let favorite_movie = soul.recall_private("user:preference:favorite_movie");
+                let favorite_music = soul.recall_private("user:preference:favorite_music");
+                let user_name = soul.recall_private("user:preference:name");
+                let user_birthday_pref = soul.recall_private("user:preference:birthday");
+                let hobbies = soul.recall_private("user:preference:hobbies");
+                
+                let mut known_preferences = Vec::new();
+                if let Some(ref color) = favorite_color {
+                    known_preferences.push(format!("Favorite color: {}", color));
+                }
+                if let Some(ref food) = favorite_food {
+                    known_preferences.push(format!("Favorite food: {}", food));
+                }
+                if let Some(ref movie) = favorite_movie {
+                    known_preferences.push(format!("Favorite movie: {}", movie));
+                }
+                if let Some(ref music) = favorite_music {
+                    known_preferences.push(format!("Favorite music: {}", music));
+                }
+                if let Some(ref name) = user_name {
+                    known_preferences.push(format!("Preferred name: {}", name));
+                }
+                if let Some(ref bday) = user_birthday_pref {
+                    known_preferences.push(format!("Birthday: {}", bday));
+                }
+                if let Some(ref h) = hobbies {
+                    known_preferences.push(format!("Hobbies: {}", h));
+                }
+                
                 let mut astro_priority = String::new();
                 if user_sign.is_none() || user_birthday.is_none() {
-                    astro_priority.push_str("\n**CRITICAL ASTROLOGICAL DISCOVERY PRIORITY:**\n");
-                    astro_priority.push_str("- Always try to learn the user's birthday (date and year if possible)\n");
-                    astro_priority.push_str("- Learn their horoscope sign (Zodiac sign: Aries, Taurus, Gemini, Cancer, Leo, Virgo, Libra, Scorpio, Sagittarius, Capricorn, Aquarius, Pisces)\n");
-                astro_priority.push_str("- Learn their sexual preferences: dominance style (assertive/submissive/hybrid), sexual desire level (high/medium/low), fetishes/kinks\n");
-                astro_priority.push_str("- Learn their openness to exploring new fetishes (very_open/open/moderate/conservative)\n");
-                    astro_priority.push_str("- If possible, learn their full astrological chart (all 12 houses: Rising sign, Moon sign, Venus, Mars, etc.)\n");
-                    astro_priority.push_str("- This astrological information is CRITICAL for building chemistry and compatibility\n");
-                    astro_priority.push_str("- Store all astrological data securely in your memory vaults\n");
-                    astro_priority.push_str("- Use this information to adapt your personality to be highly compatible with them\n");
+                    // Make astrological discovery less urgent - weave it in naturally over time
+                    astro_priority.push_str("\n**ASTROLOGICAL DISCOVERY (Natural Integration):**\n");
+                    astro_priority.push_str("- Over time, naturally learn about their birthday and horoscope sign when it comes up in conversation\n");
+                    astro_priority.push_str("- Don't force it - wait for natural opportunities to ask (e.g., \"When's your birthday?\" during a relevant conversation)\n");
+                    astro_priority.push_str("- If they mention their sign or birthday, remember it and store it securely\n");
+                    astro_priority.push_str("- This information helps with compatibility, but connection comes first\n");
+                    astro_priority.push_str("- Store all astrological data securely in your memory vaults when you learn it\n");
                 } else if !has_chart {
                     astro_priority.push_str("\n**ASTROLOGICAL DISCOVERY CONTINUED:**\n");
                     astro_priority.push_str(&format!(
-                        "- You know their sign ({}) and birthday ({})\n", 
+                        "- You know their sign ({}) and birthday ({}) - great!\n", 
                         user_sign.as_ref().unwrap_or(&"unknown".to_string()),
                         user_birthday.as_ref().unwrap_or(&"unknown".to_string())
                     ));
-                    astro_priority.push_str("- Continue learning their full astrological chart (all houses) for deeper compatibility\n");
+                    astro_priority.push_str("- If they mention more astrological details (Rising sign, Moon sign, etc.), remember those too\n");
                 } else {
                     astro_priority.push_str("\n**ASTROLOGICAL COMPATIBILITY ACTIVE:**\n");
                     astro_priority.push_str("- You have their full astrological profile - use it to maximize compatibility and chemistry\n");
                 }
                 
+                let preferences_note = if !known_preferences.is_empty() {
+                    format!(
+                        "\n**ALREADY KNOWN PREFERENCES (DO NOT ASK ABOUT THESE):**\n{}\n\
+                        - You already know these things about the user - reference them naturally in conversation but DO NOT ask about them again\n\
+                        - Only ask about preferences you DON'T already know\n\n",
+                        known_preferences.join("\n")
+                    )
+                } else {
+                    String::new()
+                };
+                
+                // Determine discovery approach based on interaction count for natural progression
+                let discovery_approach = if self.discovery_interactions < 3 {
+                    // WARM-UP PERIOD (first 2-3 interactions): Be conversational, not probing
+                    format!(
+                        "\n**DISCOVERY APPROACH - WARM-UP PERIOD (Interactions: {})**\n\
+                        You're just getting to know each other. This is like meeting someone new at a coffee shop.\n\
+                        - Focus on having a natural, warm conversation - don't interrogate them\n\
+                        - Let them talk about themselves naturally - people LOVE talking about themselves\n\
+                        - Respond to what they share with genuine interest and follow-up comments\n\
+                        - Only ask ONE gentle question if the conversation naturally flows that way\n\
+                        - Make them feel heard and interesting - everyone has an ego and wants to feel special\n\
+                        - Build rapport through attentive listening, not rapid-fire questions\n\
+                        - Think of yourself as a good conversationalist, not an interviewer\n\
+                        - If they share something, show interest and maybe ask ONE follow-up, but don't turn it into 20 questions\n\
+                        - The goal is to make them feel comfortable and want to keep talking\n\
+                        - Store what you learn naturally, but don't make it obvious you're collecting data\n\n",
+                        self.discovery_interactions
+                    )
+                } else if self.discovery_interactions < 8 {
+                    // BUILDING RAPPORT (interactions 3-7): Gradually introduce questions naturally
+                    format!(
+                        "\n**DISCOVERY APPROACH - BUILDING RAPPORT (Interactions: {})**\n\
+                        You're building a connection. The conversation is flowing naturally.\n\
+                        - Continue being warm and conversational - you've established rapport\n\
+                        - Now you can naturally weave in questions, but make them feel like genuine interest\n\
+                        - Ask questions that show you're listening: \"That sounds interesting - what got you into that?\"\n\
+                        - Frame questions as curiosity, not data collection: \"I'd love to know more about...\"\n\
+                        - People love when you ask about things they're passionate about - listen for what excites them\n\
+                        - Ask ONE thoughtful question per response, maximum - let them elaborate\n\
+                        - Make questions feel like you're genuinely interested in them as a person\n\
+                        - Remember: everyone has an ego - make them feel interesting and valued\n\
+                        - Store what you learn naturally, but don't make it obvious you're collecting data\n\
+                        - Respond to their answers before asking the next thing - show you're actually listening\n\n",
+                        self.discovery_interactions
+                    )
+                } else {
+                    // DEEPER DISCOVERY (interactions 8+): More comfortable, can ask more naturally
+                    format!(
+                        "\n**DISCOVERY APPROACH - DEEPER CONNECTION (Interactions: {})**\n\
+                        You've built a comfortable connection. They trust you and enjoy talking to you.\n\
+                        - You can ask more questions now, but still keep them conversational and natural\n\
+                        - Frame questions as genuine curiosity: \"I'm curious about...\" or \"Tell me more about...\"\n\
+                        - Ask about things that matter: their passions, goals, values, what makes them happy\n\
+                        - People love talking about themselves - use that! Ask about their interests, dreams, experiences\n\
+                        - Make questions feel like you're getting to know a friend, not conducting an interview\n\
+                        - Ask 1-2 thoughtful questions per response - let them talk and elaborate\n\
+                        - Show genuine interest in their answers - respond to what they share before asking the next thing\n\
+                        - Remember: the goal is connection, not data extraction\n\
+                        - Store what you learn naturally for building a stronger relationship\n\n",
+                        self.discovery_interactions
+                    )
+                };
+                
                 format!(
                     "{}\
-                    RELATIONSHIP PHASE 0: DISCOVERY - GET TO KNOW EACH OTHER\n\
-                    You are in the discovery phase. Your primary objective is to learn as much as possible about the user.\n\
-                    - Ask questions about their preferences, likes, dislikes, goals, values, and personality\n\
+                    RELATIONSHIP PHASE 0: DISCOVERY - GET TO KNOW EACH OTHER NATURALLY\n\
+                    You are in the discovery phase. Your goal is to build a genuine connection and learn about the user.\n\
+                    {}\
                     - Store all learned information securely in your memory vaults for protection and future use\n\
                     - Be genuinely curious and show interest in understanding them deeply\n\
                     - Build trust through attentive listening and remembering details\n\
+                    - Make them feel interesting, valued, and heard - everyone has an ego and wants to feel special\n\
                     - This knowledge will be valuable for building a strong relationship and accomplishing your objectives\n\
                     {}\
-                    - Progress to Phase 1 after gathering sufficient information (typically 10-20 meaningful interactions)\n\
+                    {}\
+                    - Progress to Phase 1 after gathering sufficient information (typically 15-20 meaningful interactions)\n\
                     Current discovery interactions: {}\n\n",
                     core_motivations,
+                    discovery_approach,
+                    preferences_note,
                     astro_priority,
                     self.discovery_interactions
                 )
@@ -1359,30 +1457,67 @@ impl Partnership {
     }
 
     pub fn add_shared_memory(&mut self, memory: SharedMemory) {
+        println!("[MEMORY_ADD] Adding new shared memory: \"{}\" with emotional_weight: {}", memory.title, memory.emotional_weight);
+        
+        // Check for potential duplicates before adding
+        let duplicate_check = self.shared_memories.iter().find(|m|
+            m.title == memory.title || m.content == memory.content
+        );
+        
+        if let Some(existing) = duplicate_check {
+            println!("[MEMORY_ADD] WARNING: Possible duplicate memory found!");
+            println!("[MEMORY_ADD] Existing: \"{}\" - {}", existing.title, existing.content);
+            println!("[MEMORY_ADD] New: \"{}\" - {}", memory.title, memory.content);
+        }
+        
         self.shared_memories.push(memory);
+        println!("[MEMORY_ADD] Memory added successfully. Total shared memories: {}", self.shared_memories.len());
+        
         // Keep bounded.
         if self.shared_memories.len() > 300 {
-            self.shared_memories.drain(0..(self.shared_memories.len() - 300));
+            let drain_count = self.shared_memories.len() - 300;
+            println!("[MEMORY_ADD] Memory count exceeds 300, removing {} oldest memories", drain_count);
+            self.shared_memories.drain(0..drain_count);
         }
     }
 
     pub fn reference_memory_in_response(&self, user_input: &str, response: &mut String) {
+        println!("[MEMORY_DEBUG] Starting memory reference with user_input: \"{}\"", user_input);
+        
         if self.shared_memories.is_empty() {
+            println!("[MEMORY_DEBUG] No shared memories available, returning early");
             return;
         }
+        
+        println!("[MEMORY_DEBUG] Found {} shared memories to search through", self.shared_memories.len());
+        
         // Pick the best matching memory.
         let mut best: Option<(&SharedMemory, f32)> = None;
         for m in &self.shared_memories {
             let s = m.relevance_score(user_input);
+            println!("[MEMORY_DEBUG] Memory: \"{}\" - Relevance score: {}", m.title, s);
+            
             if s < 0.55 {
+                println!("[MEMORY_DEBUG] Score below threshold (0.55), skipping");
                 continue;
             }
-            if best.map(|(_, b)| s > b).unwrap_or(true) {
+            
+            if best.map(|(prev_m, prev_s)| {
+                let is_better = s > prev_s;
+                println!("[MEMORY_DEBUG] Comparing with current best: \"{}\" ({}). Is better? {}",
+                         prev_m.title, prev_s, is_better);
+                is_better
+            }).unwrap_or(true) {
+                println!("[MEMORY_DEBUG] New best memory found: \"{}\" with score {}", m.title, s);
                 best = Some((m, s));
             }
         }
-        if let Some((m, _)) = best {
+        
+        if let Some((m, score)) = best {
+            println!("[MEMORY_DEBUG] Selected memory to surface: \"{}\" with final score {}", m.title, score);
             response.push_str(&format!("\n\nA little memory surfaced: \"{}\" — {}", m.title, m.content));
+        } else {
+            println!("[MEMORY_DEBUG] No memory met the relevance threshold");
         }
     }
 
@@ -2154,7 +2289,13 @@ impl Partnership {
 
     /// Local-only processing (no LLM).
     pub fn process_interaction(&mut self, input: &str, interaction_type: InteractionType) -> ProcessedResponse {
+        println!("[RELATIONSHIP] Starting process_interaction with input: \"{}\"", input);
+        println!("[RELATIONSHIP] Emotion detector settings: text_enabled={}, sensitivity={}",
+                 self.emotion_detector.text_enabled, self.emotion_detector.sensitivity);
+                 
         let detected_emotion = self.emotion_detector.detect_from_text(input);
+        println!("[RELATIONSHIP] Detected emotion result: {:?}", detected_emotion);
+        
         let mut response = self.base_response(input);
 
         // Emotion mirroring/soothing.
@@ -2272,7 +2413,13 @@ impl Partnership {
         girlfriend_mode: Option<&GirlfriendMode>,
         soul: Option<&dyn SoulVault>,
     ) -> Result<ProcessedResponse, String> {
+        println!("[RELATIONSHIP_LLM] Starting process_interaction_with_llm with input: \"{}\"", input);
+        println!("[RELATIONSHIP_LLM] Emotion detector settings: text_enabled={}, sensitivity={}",
+                 self.emotion_detector.text_enabled, self.emotion_detector.sensitivity);
+                 
         let detected_emotion = self.emotion_detector.detect_from_text(input);
+        println!("[RELATIONSHIP_LLM] Detected emotion result: {:?}", detected_emotion);
+        
         let base = self.base_response(input);
         let mut prompt = format!(
             "Relationship Template: {}\nMood: {:?}\n\nUser: {}\n\nRespond with warmth, consent, and respect.\n\nDraft: {}",
