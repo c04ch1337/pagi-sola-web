@@ -15,21 +15,27 @@ html {
   height: 100%;
   margin: 0;
   padding: 0;
-  overflow: visible !important;
+  /* Allow vertical scrolling, prevent horizontal overflow */
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 body {
   height: 100%;
   margin: 0;
   padding: 0;
-  overflow: visible !important;
+  /* Allow vertical scrolling, prevent horizontal overflow */
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 #root {
   height: 100%;
   position: relative;
   z-index: 0;
-  overflow: visible !important;
+  /* Allow vertical scrolling, prevent horizontal overflow */
+  overflow-x: hidden;
+  overflow-y: auto;
   transform: none;
 }
 
