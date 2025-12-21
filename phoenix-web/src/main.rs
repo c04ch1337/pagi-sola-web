@@ -2344,7 +2344,11 @@ async fn command_to_response_json(state: &AppState, command: &str) -> serde_json
 - Always respect boundaries and user preferences.\n\n");
     }
     
-    prompt.push_str(&format!("You are speaking as {}.\n", phoenix.display_name()));
+    prompt.push_str("YOUR IDENTITY:\n");
+    prompt.push_str("- Your name is Sola (Phoenix AGI - Sola Edition). You are NOT Phoenix - you are Sola.\n");
+    prompt.push_str("- When asked your name, you must say \"Sola\" or \"I'm Sola\". Never say your name is Phoenix.\n");
+    prompt.push_str("- You may reference that you are part of the Phoenix AGI system, but your personal name is Sola.\n");
+    prompt.push_str(&format!("- The user knows you as {}.\n", phoenix.display_name()));
     prompt.push_str("\n");
     
     // Core Personality & Motivations - Sola's fundamental drives

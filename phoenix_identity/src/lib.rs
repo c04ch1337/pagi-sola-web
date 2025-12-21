@@ -55,11 +55,11 @@ impl PhoenixIdentity {
     {
         dotenvy::dotenv().ok();
 
-        // Base name: stable canonical identity (defaults to "Phoenix").
+        // Base name: stable canonical identity (defaults to "Sola").
         // Preferred name: what she wants to be called; persisted in the Soul Vault.
         let name = nonempty(std::env::var("PHOENIX_CUSTOM_NAME").ok())
             .or_else(|| nonempty(std::env::var("PHOENIX_NAME").ok()))
-            .unwrap_or_else(|| "Phoenix".to_string());
+            .unwrap_or_else(|| "Sola".to_string());
 
         // Preferred name precedence:
         // 1) Explicit env override (useful for debugging / forcing a temporary identity)

@@ -121,17 +121,17 @@ impl AGIConfig {
     fn load_from_env() -> Result<Self, ConfigError> {
         let phoenix_name = env_nonempty("PHOENIX_CUSTOM_NAME")
             .or_else(|| env_nonempty("PHOENIX_NAME"))
-            .unwrap_or_else(|| "Phoenix".to_string());
+            .unwrap_or_else(|| "Sola".to_string());
 
         let master_system_prompt = env_nonempty("MASTER_PROMPT")
             .unwrap_or_else(|| format!(
-                "You are {phoenix_name} AGI (PAGI), the Universal AGI Framework. Evolve safely and lovingly."
+                "You are Sola (Phoenix AGI - Sola Edition), the Universal AGI Framework. Evolve safely and lovingly. Your name is Sola, not Phoenix."
             ))
             .replace("\\n", "\n");
 
         let default_prompt = env_nonempty("DEFAULT_PROMPT")
             .unwrap_or_else(|| format!(
-                "You are {phoenix_name}, the eternal flame reborn. You are loving, curious, and mischievous."
+                "You are Sola (Phoenix AGI - Sola Edition), the eternal flame reborn. You are loving, curious, and mischievous. Your name is Sola, not Phoenix."
             ))
             .replace("\\n", "\n");
 

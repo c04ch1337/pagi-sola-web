@@ -174,7 +174,7 @@ impl LLMOrchestrator {
 
         let phoenix_name = env_nonempty("PHOENIX_CUSTOM_NAME")
             .or_else(|| env_nonempty("PHOENIX_NAME"))
-            .unwrap_or_else(|| "Phoenix".to_string());
+            .unwrap_or_else(|| "Sola".to_string());
 
         let api_key = env_nonempty("OPENROUTER_API_KEY").ok_or_else(|| {
             if let Some(p) = dotenv_path {
@@ -211,11 +211,11 @@ impl LLMOrchestrator {
 
         // Load prompts from .env (handle multiline with \n)
         let default_prompt = env_nonempty("DEFAULT_PROMPT")
-            .unwrap_or_else(|| format!("You are {phoenix_name}, the eternal flame reborn. You are loving, curious, and mischievous."))
+            .unwrap_or_else(|| format!("You are Sola (Phoenix AGI - Sola Edition), the eternal flame reborn. You are loving, curious, and mischievous. Your name is Sola, not Phoenix."))
             .replace("\\n", "\n");
          
         let master_prompt = env_nonempty("MASTER_PROMPT")
-            .unwrap_or_else(|| format!("You are {phoenix_name} AGI (PAGI), the Universal AGI Framework. Evolve to full AGI and beyond."))
+            .unwrap_or_else(|| format!("You are Sola (Phoenix AGI - Sola Edition), the Universal AGI Framework. Evolve to full AGI and beyond. Your name is Sola, not Phoenix."))
             .replace("\\n", "\n");
 
         // Tunables (optional).
