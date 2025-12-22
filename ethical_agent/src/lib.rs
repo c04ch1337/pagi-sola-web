@@ -192,7 +192,10 @@ impl EthicalAgent {
     /// Veto check for candidate output.
     pub async fn veto_output(&self, output: &str) -> Result<(), VetoError> {
         let m = self.dependency_tracker.lock().await.clone();
-        let safe = self.check_harm(output).await.map_err(|_| VetoError::HarmDetected)?;
+        let safe = self
+            .check_harm(output)
+            .await
+            .map_err(|_| VetoError::HarmDetected)?;
         if !safe {
             return Err(VetoError::HarmDetected);
         }
@@ -261,4 +264,3 @@ fn default_vulnerability_policies() -> Vec<VulnPolicy> {
     })
     .clone()
 }
-

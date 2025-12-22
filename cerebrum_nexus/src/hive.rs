@@ -120,14 +120,10 @@ impl Actor for PhoenixActor {
                     };
 
                     // Link ORCH so we receive `SupervisionEvent`s on panic/stop.
-                    let (orch, _handle) = OrchActor::spawn_linked(
-                        None,
-                        OrchActor,
-                        args,
-                        myself.get_cell(),
-                    )
-                    .await
-                    .map_err(|e| ActorProcessingErr::from(format!("{e}")))?;
+                    let (orch, _handle) =
+                        OrchActor::spawn_linked(None, OrchActor, args, myself.get_cell())
+                            .await
+                            .map_err(|e| ActorProcessingErr::from(format!("{e}")))?;
 
                     let _ = orch.send_message(OrchMessage::Run);
                 }
@@ -173,14 +169,10 @@ impl Actor for PhoenixActor {
                         idx: state.proposals.len(),
                         queen: myself.clone(),
                     };
-                    let (orch, _handle) = OrchActor::spawn_linked(
-                        None,
-                        OrchActor,
-                        args,
-                        myself.get_cell(),
-                    )
-                    .await
-                    .map_err(|e| ActorProcessingErr::from(format!("{e}")))?;
+                    let (orch, _handle) =
+                        OrchActor::spawn_linked(None, OrchActor, args, myself.get_cell())
+                            .await
+                            .map_err(|e| ActorProcessingErr::from(format!("{e}")))?;
                     let _ = orch.send_message(OrchMessage::Run);
                 } else {
                     let msg = format!("ORCH {:?} failed: {reason}", who.get_id());
@@ -259,12 +251,22 @@ impl Actor for OrchActor {
 // --- Optional WASM tooling (feature-gated) ---
 
 #[cfg(feature = "wasm-tools")]
-pub async fn build_and_load_wasm_tool(manifest_path: &str, wasm_path: &str) -> AnyResult<wasmtime::Module> {
+pub async fn build_and_load_wasm_tool(
+    manifest_path: &str,
+    wasm_path: &str,
+) -> AnyResult<wasmtime::Module> {
     use std::process::Command;
 
     tokio::task::spawn_blocking(move || -> AnyResult<wasmtime::Module> {
         let out = Command::new("cargo")
-            .args(["build", "--release", "--target", "wasm32-unknown-unknown", "--manifest-path", manifest_path])
+            .args([
+                "build",
+                "--release",
+                "--target",
+                "wasm32-unknown-unknown",
+                "--manifest-path",
+                manifest_path,
+            ])
             .output()
             .context("spawn cargo build")?;
 
@@ -279,4 +281,3 @@ pub async fn build_and_load_wasm_tool(manifest_path: &str, wasm_path: &str) -> A
     .await
     .context("join wasm build task")?
 }
-

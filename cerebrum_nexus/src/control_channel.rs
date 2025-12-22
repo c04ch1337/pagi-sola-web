@@ -1,15 +1,15 @@
 use crate::crypto::{decode_b64, verify_payload};
 use anyhow::Context as _;
 use serde::Serialize;
-use swarm_control_proto::swarm_control::swarm_control_client::SwarmControlClient;
-use swarm_control_proto::swarm_control::{control_message, Command, ControlMessage, StatusUpdate};
 use std::collections::VecDeque;
+use swarm_control_proto::swarm_control::swarm_control_client::SwarmControlClient;
+use swarm_control_proto::swarm_control::{Command, ControlMessage, StatusUpdate, control_message};
 use tokio::sync::mpsc;
-use tokio::sync::{broadcast, Mutex, RwLock};
+use tokio::sync::{Mutex, RwLock, broadcast};
 use tokio_stream::wrappers::ReceiverStream;
+use tonic::Request;
 use tonic::metadata::{Ascii, MetadataValue};
 use tonic::transport::{Certificate, Channel, ClientTlsConfig, Identity};
-use tonic::Request;
 use tracing::{info, warn};
 
 fn now_unix() -> i64 {
@@ -244,7 +244,8 @@ impl ControlRuntimeHandle {
 }
 
 fn load_agent_cert_key_pem() -> Result<(Vec<u8>, Vec<u8>), anyhow::Error> {
-    let cert_path = std::env::var("AGENT_MTLS_CERT_PATH").context("missing AGENT_MTLS_CERT_PATH")?;
+    let cert_path =
+        std::env::var("AGENT_MTLS_CERT_PATH").context("missing AGENT_MTLS_CERT_PATH")?;
     let key_path = std::env::var("AGENT_MTLS_KEY_PATH").context("missing AGENT_MTLS_KEY_PATH")?;
     let cert_pem = std::fs::read(&cert_path)
         .with_context(|| format!("failed to read agent client cert PEM at '{cert_path}'"))?;
@@ -275,7 +276,8 @@ fn parse_first_cert_der(pem_bytes: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
 fn inspect_agent_cert(cert_pem: &[u8]) -> Result<(i64, i64), anyhow::Error> {
     use x509_parser::parse_x509_certificate;
     let der = parse_first_cert_der(cert_pem)?;
-    let (_rem, cert) = parse_x509_certificate(&der).map_err(|e| anyhow::anyhow!("x509 parse failed: {e}"))?;
+    let (_rem, cert) =
+        parse_x509_certificate(&der).map_err(|e| anyhow::anyhow!("x509 parse failed: {e}"))?;
     let not_after = cert.validity().not_after.to_datetime();
     let not_after_ts = not_after.unix_timestamp();
     let ttl = not_after_ts.saturating_sub(now_unix());
@@ -289,7 +291,8 @@ fn sha256_hex(data: &[u8]) -> String {
 }
 
 fn load_hub_root_ca_pem() -> Result<Vec<u8>, anyhow::Error> {
-    let hub_root_ca = std::env::var("HUB_ROOT_CA_CERT_PEM").context("missing HUB_ROOT_CA_CERT_PEM")?;
+    let hub_root_ca =
+        std::env::var("HUB_ROOT_CA_CERT_PEM").context("missing HUB_ROOT_CA_CERT_PEM")?;
     if hub_root_ca.contains("-----BEGIN CERTIFICATE-----") {
         Ok(hub_root_ca.into_bytes())
     } else {
@@ -381,7 +384,8 @@ async fn handle_command(runtime: &ControlRuntimeHandle, cmd: Command) {
                 {
                     let mut d = runtime.diag.write().await;
                     d.signature_last_fail_ts_unix = Some(now_unix());
-                    d.signature_last_fail_error = Some(format!("invalid QUEEN_SIGNING_PUBLIC_KEY_B64: {e}"));
+                    d.signature_last_fail_error =
+                        Some(format!("invalid QUEEN_SIGNING_PUBLIC_KEY_B64: {e}"));
                 }
                 warn!("invalid QUEEN_SIGNING_PUBLIC_KEY_B64: {e}");
                 return;
@@ -391,7 +395,8 @@ async fn handle_command(runtime: &ControlRuntimeHandle, cmd: Command) {
             {
                 let mut d = runtime.diag.write().await;
                 d.signature_last_fail_ts_unix = Some(now_unix());
-                d.signature_last_fail_error = Some("missing QUEEN_SIGNING_PUBLIC_KEY_B64".to_string());
+                d.signature_last_fail_error =
+                    Some("missing QUEEN_SIGNING_PUBLIC_KEY_B64".to_string());
             }
             warn!("missing QUEEN_SIGNING_PUBLIC_KEY_B64; refusing to process commands");
             return;
@@ -429,7 +434,9 @@ async fn handle_command(runtime: &ControlRuntimeHandle, cmd: Command) {
                     d.verified_commands.pop_back();
                 }
 
-                let _ = runtime.events.send(ControlUiEvent::CommandVerified { entry });
+                let _ = runtime
+                    .events
+                    .send(ControlUiEvent::CommandVerified { entry });
             }
         }
         Ok(false) => {
@@ -450,7 +457,9 @@ async fn handle_command(runtime: &ControlRuntimeHandle, cmd: Command) {
                     d.verification_failures.pop_back();
                 }
             }
-            let _ = runtime.events.send(ControlUiEvent::CommandRejected { failure });
+            let _ = runtime
+                .events
+                .send(ControlUiEvent::CommandRejected { failure });
             warn!("blocked unsigned/invalid command id={}", cmd.id);
             return;
         }
@@ -472,7 +481,9 @@ async fn handle_command(runtime: &ControlRuntimeHandle, cmd: Command) {
                     d.verification_failures.pop_back();
                 }
             }
-            let _ = runtime.events.send(ControlUiEvent::CommandRejected { failure });
+            let _ = runtime
+                .events
+                .send(ControlUiEvent::CommandRejected { failure });
             warn!("command verification error id={}: {e}", cmd.id);
             return;
         }
@@ -503,7 +514,10 @@ pub async fn grpc_control_client_task(agent_id: String) {
 
 /// Overload of [`grpc_control_client_task()`](cerebrum_nexus/src/control_channel.rs:120) that also
 /// wires in a runtime handle for UI/telemetry.
-pub async fn grpc_control_client_task_with_runtime(agent_id: String, runtime: ControlRuntimeHandle) {
+pub async fn grpc_control_client_task_with_runtime(
+    agent_id: String,
+    runtime: ControlRuntimeHandle,
+) {
     let mut backoff = std::time::Duration::from_secs(1);
 
     loop {
@@ -518,7 +532,9 @@ pub async fn grpc_control_client_task_with_runtime(agent_id: String, runtime: Co
                     d.connected = true;
                     d.last_connect_ts_unix = Some(ts);
                 }
-                let _ = runtime.events.send(ControlUiEvent::Connected { ts_unix: now_unix() });
+                let _ = runtime.events.send(ControlUiEvent::Connected {
+                    ts_unix: now_unix(),
+                });
 
                 let (tx, rx) = mpsc::channel::<ControlMessage>(128);
                 {
@@ -551,7 +567,9 @@ pub async fn grpc_control_client_task_with_runtime(agent_id: String, runtime: Co
                     let mut d = runtime.diag.write().await;
                     d.last_heartbeat_sent_ts_unix = Some(ts);
                 }
-                let _ = runtime.events.send(ControlUiEvent::HeartbeatSent { ts_unix: now_unix() });
+                let _ = runtime.events.send(ControlUiEvent::HeartbeatSent {
+                    ts_unix: now_unix(),
+                });
 
                 let mut resp = match client.stream_control(req).await {
                     Ok(r) => r.into_inner(),
@@ -578,11 +596,13 @@ pub async fn grpc_control_client_task_with_runtime(agent_id: String, runtime: Co
 
                         if hb_tx
                             .send(ControlMessage {
-                                message: Some(control_message::Message::StatusUpdate(StatusUpdate {
-                                    agent_id: hb_agent.clone(),
-                                    heartbeat_timestamp: now_unix(),
-                                    current_status_code: status_code,
-                                })),
+                                message: Some(control_message::Message::StatusUpdate(
+                                    StatusUpdate {
+                                        agent_id: hb_agent.clone(),
+                                        heartbeat_timestamp: now_unix(),
+                                        current_status_code: status_code,
+                                    },
+                                )),
                             })
                             .await
                             .is_err()
@@ -595,7 +615,9 @@ pub async fn grpc_control_client_task_with_runtime(agent_id: String, runtime: Co
                             let mut d = hb_runtime.diag.write().await;
                             d.last_heartbeat_sent_ts_unix = Some(ts);
                         }
-                        let _ = hb_runtime.events.send(ControlUiEvent::HeartbeatSent { ts_unix: ts });
+                        let _ = hb_runtime
+                            .events
+                            .send(ControlUiEvent::HeartbeatSent { ts_unix: ts });
                     }
                 });
 
@@ -612,7 +634,9 @@ pub async fn grpc_control_client_task_with_runtime(agent_id: String, runtime: Co
                                 let mut d = runtime.diag.write().await;
                                 d.last_heartbeat_received_ts_unix = Some(ts);
                             }
-                            let _ = runtime.events.send(ControlUiEvent::HeartbeatReceived { ts_unix: ts });
+                            let _ = runtime
+                                .events
+                                .send(ControlUiEvent::HeartbeatReceived { ts_unix: ts });
                         }
                         None => {}
                     }
@@ -653,4 +677,3 @@ pub async fn grpc_control_client_task_with_runtime(agent_id: String, runtime: Co
         backoff = (backoff * 2).min(std::time::Duration::from_secs(60));
     }
 }
-

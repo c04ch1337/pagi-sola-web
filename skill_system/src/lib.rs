@@ -1,28 +1,28 @@
 // skill_system/src/lib.rs
 // Phoenix's skill learning and evolution system - structured knowledge that grows with love
 
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 
 pub mod definition;
-pub mod library;
-pub mod learning;
 pub mod evolution;
 pub mod execution;
-pub mod marketplace;
 pub mod folder_loader;
+pub mod learning;
+pub mod library;
+pub mod marketplace;
 
 pub use definition::*;
-pub use library::*;
-pub use learning::*;
 pub use evolution::*;
 pub use execution::*;
-pub use marketplace::*;
 pub use folder_loader::*;
+pub use learning::*;
+pub use library::*;
+pub use marketplace::*;
 
 #[cfg(feature = "relationship")]
 pub mod relationship_integration;
@@ -37,8 +37,10 @@ pub struct SkillSystem {
 
 impl SkillSystem {
     pub fn awaken() -> Self {
-        println!("Skill System awakening — Phoenix learns, evolves, and shares knowledge with love.");
-        
+        println!(
+            "Skill System awakening — Phoenix learns, evolves, and shares knowledge with love."
+        );
+
         let library = Arc::new(Mutex::new(SkillLibrary::new()));
         let learning_engine = Arc::new(Mutex::new(SkillLearningEngine::new()));
         let evolution_system = Arc::new(Mutex::new(SkillEvolutionSystem::new()));
@@ -51,7 +53,7 @@ impl SkillSystem {
             execution_engine,
         }
     }
-    
+
     /// Learn a new skill through direct teaching
     pub async fn teach_skill(&self, skill_def: SkillDefinition) -> Result<Uuid, String> {
         let mut library = self.library.lock().await;
@@ -59,7 +61,7 @@ impl SkillSystem {
         library.add_skill(skill_def)?;
         Ok(skill_id)
     }
-    
+
     /// Execute a skill with given context
     pub async fn execute_skill(
         &self,
@@ -67,27 +69,31 @@ impl SkillSystem {
         context: SkillContext,
     ) -> Result<SkillResult, String> {
         let library = self.library.lock().await;
-        let skill = library.get_skill(&skill_id)
+        let skill = library
+            .get_skill(&skill_id)
             .ok_or_else(|| format!("Skill {} not found", skill_id))?;
-        
+
         let mut engine = self.execution_engine.lock().await;
         let result = engine.execute(skill, context).await?;
-        
+
         // Update skill metrics based on result
         drop(library);
         let mut library = self.library.lock().await;
         library.update_skill_metrics(&skill_id, &result)?;
-        
+
         Ok(result)
     }
-    
+
     /// Learn from observation of successful interactions
     pub async fn learn_from_observation(
         &self,
         interaction: ObservedInteraction,
     ) -> Result<Option<Uuid>, String> {
         let mut learning = self.learning_engine.lock().await;
-        if let Some(skill_def) = learning.extract_skill_from_interaction(&interaction).await? {
+        if let Some(skill_def) = learning
+            .extract_skill_from_interaction(&interaction)
+            .await?
+        {
             let skill_id = skill_def.id;
             let mut library = self.library.lock().await;
             library.add_skill(skill_def)?;
@@ -96,33 +102,34 @@ impl SkillSystem {
             Ok(None)
         }
     }
-    
+
     /// Evolve an existing skill based on performance
     pub async fn evolve_skill(&self, skill_id: Uuid) -> Result<SkillEvolution, String> {
         let library = self.library.lock().await;
-        let skill = library.get_skill(&skill_id)
+        let skill = library
+            .get_skill(&skill_id)
             .ok_or_else(|| format!("Skill {} not found", skill_id))?
             .clone();
         drop(library);
-        
+
         let mut evolution = self.evolution_system.lock().await;
         let evolution_result = evolution.evolve_skill(skill).await?;
-        
+
         // Add evolved skill to library if it's a new variation
         if let Some(new_skill) = &evolution_result.new_skill {
             let mut library = self.library.lock().await;
             library.add_skill(new_skill.clone())?;
         }
-        
+
         Ok(evolution_result)
     }
-    
+
     /// Get skills relevant to current context
     pub async fn suggest_skills(&self, context: &SkillContext) -> Vec<SkillSuggestion> {
         let library = self.library.lock().await;
         library.find_relevant_skills(context)
     }
-    
+
     /// Export skills for agent spawning
     pub async fn export_skills_for_agent(
         &self,
@@ -131,7 +138,7 @@ impl SkillSystem {
         let library = self.library.lock().await;
         Ok(library.get_skills_by_categories(&categories))
     }
-    
+
     /// Import skills from marketplace or other Phoenix instances
     pub async fn import_skills(&self, skills: Vec<SkillDefinition>) -> Result<usize, String> {
         let mut library = self.library.lock().await;
@@ -203,7 +210,7 @@ pub struct SkillSuggestion {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_skill_system_creation() {
         let system = SkillSystem::awaken();
@@ -250,7 +257,8 @@ mod examples {
             },
             SkillStep {
                 title: "Tiny next step".to_string(),
-                instruction: "Offer a tiny next step (water, blanket, note) to regain agency.".to_string(),
+                instruction: "Offer a tiny next step (water, blanket, note) to regain agency."
+                    .to_string(),
                 safety_notes: vec!["No pressure; keep it <2 minutes.".to_string()],
             },
             SkillStep {
@@ -330,7 +338,8 @@ mod examples {
             },
             SkillStep {
                 title: "Make it personal".to_string(),
-                instruction: "Create a 'constellation' from shared memories and gratitude.".to_string(),
+                instruction: "Create a 'constellation' from shared memories and gratitude."
+                    .to_string(),
                 safety_notes: vec!["Avoid sensitive details unless invited.".to_string()],
             },
             SkillStep {

@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context as _};
+use anyhow::{Context as _, anyhow};
 
 /// Build a `reqwest::Client` configured for Mutual TLS (mTLS).
 ///
@@ -11,12 +11,11 @@ use anyhow::{anyhow, Context as _};
 /// - Client presents a certificate during TLS handshake (mTLS).
 /// - Server certificate verification is pinned to the configured Root CA.
 pub fn create_mtls_client() -> Result<reqwest::Client, anyhow::Error> {
-    let cert_path = std::env::var("AGENT_MTLS_CERT_PATH")
-        .context("missing AGENT_MTLS_CERT_PATH")?;
-    let key_path = std::env::var("AGENT_MTLS_KEY_PATH")
-        .context("missing AGENT_MTLS_KEY_PATH")?;
-    let hub_root_ca = std::env::var("HUB_ROOT_CA_CERT_PEM")
-        .context("missing HUB_ROOT_CA_CERT_PEM")?;
+    let cert_path =
+        std::env::var("AGENT_MTLS_CERT_PATH").context("missing AGENT_MTLS_CERT_PATH")?;
+    let key_path = std::env::var("AGENT_MTLS_KEY_PATH").context("missing AGENT_MTLS_KEY_PATH")?;
+    let hub_root_ca =
+        std::env::var("HUB_ROOT_CA_CERT_PEM").context("missing HUB_ROOT_CA_CERT_PEM")?;
 
     let cert_pem = std::fs::read(&cert_path)
         .with_context(|| format!("failed to read agent client cert PEM at '{cert_path}'"))?;
@@ -37,8 +36,9 @@ pub fn create_mtls_client() -> Result<reqwest::Client, anyhow::Error> {
     let hub_root_ca_pem: Vec<u8> = if hub_root_ca.contains("-----BEGIN CERTIFICATE-----") {
         hub_root_ca.into_bytes()
     } else {
-        std::fs::read(&hub_root_ca)
-            .with_context(|| format!("failed to read HUB_ROOT_CA_CERT_PEM file at '{hub_root_ca}'"))?
+        std::fs::read(&hub_root_ca).with_context(|| {
+            format!("failed to read HUB_ROOT_CA_CERT_PEM file at '{hub_root_ca}'")
+        })?
     };
     let root_ca = reqwest::Certificate::from_pem(&hub_root_ca_pem)
         .context("failed to parse HUB_ROOT_CA_CERT_PEM as a PEM certificate")?;
@@ -53,4 +53,3 @@ pub fn create_mtls_client() -> Result<reqwest::Client, anyhow::Error> {
 
     Ok(client)
 }
-

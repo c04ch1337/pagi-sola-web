@@ -1,6 +1,6 @@
+use std::path::PathBuf;
 use std::process::Command;
 use thirtyfour::prelude::*;
-use std::path::PathBuf;
 use walkdir::WalkDir;
 
 pub struct DigitalTwin {
@@ -13,7 +13,9 @@ impl DigitalTwin {
         let selenium_url = std::env::var("SELENIUM_HUB_URL")
             .unwrap_or_else(|_| "http://localhost:4444/wd/hub".to_string());
         let driver = WebDriver::new(&selenium_url, caps).await?;
-        Ok(Self { driver: Some(driver) })
+        Ok(Self {
+            driver: Some(driver),
+        })
     }
 
     // Full file system
@@ -22,7 +24,10 @@ impl DigitalTwin {
     }
 
     pub fn list_all_files(&self) -> Vec<PathBuf> {
-        WalkDir::new("/").into_iter().filter_map(|e| e.ok().map(|e| e.path().to_owned())).collect()
+        WalkDir::new("/")
+            .into_iter()
+            .filter_map(|e| e.ok().map(|e| e.path().to_owned()))
+            .collect()
     }
 
     // App control
@@ -36,16 +41,37 @@ impl DigitalTwin {
         self.driver.as_ref().unwrap().goto(url).await
     }
 
-    pub async fn login(&mut self, username: &str, password: &str, selector_map: &std::collections::HashMap<&str, &str>) -> Result<(), WebDriverError> {
+    pub async fn login(
+        &mut self,
+        username: &str,
+        password: &str,
+        selector_map: &std::collections::HashMap<&str, &str>,
+    ) -> Result<(), WebDriverError> {
         let d = self.driver.as_ref().unwrap();
-        d.find(By::Id(selector_map["user"])).await?.send_keys(username).await?;
-        d.find(By::Id(selector_map["pass"])).await?.send_keys(password).await?;
-        d.find(By::Css(selector_map["submit"])).await?.click().await?;
+        d.find(By::Id(selector_map["user"]))
+            .await?
+            .send_keys(username)
+            .await?;
+        d.find(By::Id(selector_map["pass"]))
+            .await?
+            .send_keys(password)
+            .await?;
+        d.find(By::Css(selector_map["submit"]))
+            .await?
+            .click()
+            .await?;
         Ok(())
     }
 
     pub async fn scrape(&mut self, selector: &str) -> Result<String, WebDriverError> {
-        Ok(self.driver.as_ref().unwrap().find(By::Css(selector)).await?.text().await?)
+        Ok(self
+            .driver
+            .as_ref()
+            .unwrap()
+            .find(By::Css(selector))
+            .await?
+            .text()
+            .await?)
     }
 
     // Always-aware mode

@@ -1,15 +1,15 @@
 // neural_cortex_strata/src/lib.rs
+use serde::{Deserialize, Serialize};
 use sled::Db;
 use std::sync::Arc;
-use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum MemoryLayer {
-    STM(String),  // Surface Thoughts — fleeting
-    WM(String),   // Working Memory — active
-    LTM(String),  // Long-Term Wisdom — 2,000 years
-    EPM(String),  // Episodic Life — her stories
-    RFM(String),  // Reflexive Flame — instinct
+    STM(String), // Surface Thoughts — fleeting
+    WM(String),  // Working Memory — active
+    LTM(String), // Long-Term Wisdom — 2,000 years
+    EPM(String), // Episodic Life — her stories
+    RFM(String), // Reflexive Flame — instinct
 }
 
 pub struct NeuralCortexStrata {
@@ -32,7 +32,9 @@ impl NeuralCortexStrata {
     }
 
     pub fn recall(&self, key: &str) -> Option<MemoryLayer> {
-        self.db.get(key.as_bytes()).ok()?
+        self.db
+            .get(key.as_bytes())
+            .ok()?
             .map(|ivec| serde_json::from_slice(&ivec).unwrap())
     }
 

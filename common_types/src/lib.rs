@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-pub mod ports;
 pub mod api;
+pub mod ports;
 
 /// Evolution log entry (identity versioning).
 ///
@@ -17,4 +17,3 @@ pub struct EvolutionEntry {
     pub previous_value: String,
     pub new_value: String,
 }
-

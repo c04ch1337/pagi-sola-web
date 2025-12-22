@@ -9,16 +9,19 @@
 //!   - `face-rustface` / `face-dlib` => [`rustface`](https://crates.io/crates/rustface) / [`dlib-face-recognition`](https://crates.io/crates/dlib-face-recognition)
 
 use chrono::Utc;
-use emotion_detection::{EmotionalState, EmotionDetector};
+use emotion_detection::{EmotionDetector, EmotionalState};
 use image::DynamicImage;
+use multi_modal_input::LiveMultiModalInput;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 use tokio::sync::Mutex;
 use vital_organ_vaults::VitalOrganVaults;
-use multi_modal_input::LiveMultiModalInput;
 
 /// Image type used by [`MultiModalRecorder::recognize_user()`](crate::MultiModalRecorder::recognize_user).
 pub type Image = DynamicImage;
@@ -198,7 +201,9 @@ impl MultiModalRecorder {
     /// should be serialized (container format TBD: e.g. Matroska/WebM).
     pub async fn start_on_demand(&self, duration_secs: u64) -> Result<PathBuf, Error> {
         if duration_secs == 0 {
-            return Err(Error::InvalidArgument("duration_secs must be > 0".to_string()));
+            return Err(Error::InvalidArgument(
+                "duration_secs must be > 0".to_string(),
+            ));
         }
 
         tokio::fs::create_dir_all(&self.storage_path).await?;
@@ -394,30 +399,28 @@ impl MultiModalRecorder {
 
             while !stop.load(Ordering::Relaxed) {
                 // Video -> emotion (best-effort)
-            #[cfg(feature = "video")]
-            if let Some(vs) = video.as_ref() {
+                #[cfg(feature = "video")]
+                if let Some(vs) = video.as_ref() {
                     use nokhwa::pixel_format::RgbFormat;
 
                     match vs.camera.frame() {
-                        Ok(buffer) => {
-                            match buffer.decode_image::<RgbFormat>() {
-                                Ok(rgb) => {
-                                    let mut state = this
-                                        .emotion_detector
-                                        .fused_emotional_state("", None, Some(rgb.clone()))
-                                        .await;
+                        Ok(buffer) => match buffer.decode_image::<RgbFormat>() {
+                            Ok(rgb) => {
+                                let mut state = this
+                                    .emotion_detector
+                                    .fused_emotional_state("", None, Some(rgb.clone()))
+                                    .await;
 
-                                    *this.last_emotional_state.lock().await = Some(state.clone());
-                                    this.append_emotional_moment_best_effort(
-                                        &state,
-                                        Path::new("(live-stream)"),
-                                    );
-                                }
-                                Err(e) => {
-                                    eprintln!("[multi_modal_recording] decode_image failed: {e}");
-                                }
+                                *this.last_emotional_state.lock().await = Some(state.clone());
+                                this.append_emotional_moment_best_effort(
+                                    &state,
+                                    Path::new("(live-stream)"),
+                                );
                             }
-                        }
+                            Err(e) => {
+                                eprintln!("[multi_modal_recording] decode_image failed: {e}");
+                            }
+                        },
                         Err(e) => {
                             eprintln!("[multi_modal_recording] webcam frame capture failed: {e}");
                         }
@@ -479,7 +482,10 @@ impl MultiModalRecorder {
                 "stub"
             }
         });
-        std::fs::write(&model_path, serde_json::to_vec_pretty(&data).unwrap_or_default())?;
+        std::fs::write(
+            &model_path,
+            serde_json::to_vec_pretty(&data).unwrap_or_default(),
+        )?;
         self.user_voice_model = Some(model_path);
         Ok(())
     }
@@ -513,7 +519,10 @@ impl MultiModalRecorder {
                 "stub"
             }
         });
-        std::fs::write(&model_path, serde_json::to_vec_pretty(&data).unwrap_or_default())?;
+        std::fs::write(
+            &model_path,
+            serde_json::to_vec_pretty(&data).unwrap_or_default(),
+        )?;
         self.user_face_model = Some(model_path);
         Ok(())
     }
@@ -523,9 +532,21 @@ impl MultiModalRecorder {
     /// Current behavior:
     /// - if a model is enrolled, returns high confidence
     /// - otherwise returns low confidence
-    pub fn recognize_user(&self, _audio_sample: &[f32], _video_frame: &Image) -> RecognitionConfidence {
-        let voice: f32 = if self.user_voice_model.is_some() { 0.92_f32 } else { 0.10_f32 };
-        let face: f32 = if self.user_face_model.is_some() { 0.93_f32 } else { 0.10_f32 };
+    pub fn recognize_user(
+        &self,
+        _audio_sample: &[f32],
+        _video_frame: &Image,
+    ) -> RecognitionConfidence {
+        let voice: f32 = if self.user_voice_model.is_some() {
+            0.92_f32
+        } else {
+            0.10_f32
+        };
+        let face: f32 = if self.user_face_model.is_some() {
+            0.93_f32
+        } else {
+            0.10_f32
+        };
         let combined: f32 = (voice * 0.5_f32 + face * 0.5_f32).clamp(0.0_f32, 1.0_f32);
         RecognitionConfidence {
             voice,
@@ -556,7 +577,10 @@ impl MultiModalRecorder {
     /// Clear all encrypted recordings in the configured storage directory (privacy command).
     pub async fn clear_all_recordings(&self) -> Result<u64, Error> {
         let mut removed = 0u64;
-        if !tokio::fs::try_exists(&self.storage_path).await.unwrap_or(false) {
+        if !tokio::fs::try_exists(&self.storage_path)
+            .await
+            .unwrap_or(false)
+        {
             return Ok(0);
         }
         let mut rd = tokio::fs::read_dir(&self.storage_path).await?;
@@ -625,6 +649,7 @@ fn xor_encrypt(data: &[u8], key: &[u8]) -> Vec<u8> {
 
 #[allow(dead_code)]
 fn is_file(path: &Path) -> bool {
-    std::fs::metadata(path).map(|m| m.is_file()).unwrap_or(false)
+    std::fs::metadata(path)
+        .map(|m| m.is_file())
+        .unwrap_or(false)
 }
-

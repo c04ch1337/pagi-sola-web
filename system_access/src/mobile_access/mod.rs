@@ -109,4 +109,3 @@ pub trait DeviceController {
     fn pull_file(&self, remote_path: &str, local_path: &str) -> Result<(), MobileError>;
     fn capture_screen(&self) -> Result<PathBuf, MobileError>;
 }
-

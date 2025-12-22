@@ -1,4 +1,4 @@
-use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer};
+use actix_web::{App, HttpRequest, HttpResponse, HttpServer, middleware, web};
 use common_types::api::ApiErrorResponse;
 use serde::{Deserialize, Serialize};
 use std::io;
@@ -6,9 +6,9 @@ use std::io::BufReader;
 use std::{fs::File, sync::Arc};
 use tracing::{info, warn};
 
+use rustls::RootCertStore;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use rustls::server::WebPkiClientVerifier;
-use rustls::RootCertStore;
 
 use ed25519_dalek::Signer as _;
 
@@ -29,13 +29,7 @@ fn api_error_forbidden_mtls(instance: &str, detail: impl Into<String>) -> ApiErr
 }
 
 fn api_error_db_down(instance: &str, detail: impl Into<String>) -> ApiErrorResponse {
-    ApiErrorResponse::new(
-        "503-DB-DOWN",
-        "Database unavailable",
-        detail,
-        503,
-        instance,
-    )
+    ApiErrorResponse::new("503-DB-DOWN", "Database unavailable", detail, 503, instance)
 }
 
 fn api_error_signing_key_down(instance: &str, detail: impl Into<String>) -> ApiErrorResponse {
@@ -80,16 +74,26 @@ fn load_signing_key_from_env() -> Result<ed25519_dalek::SigningKey, String> {
 }
 
 fn read_env_required(key: &str) -> Result<String, io::Error> {
-    std::env::var(key).map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, format!("missing {key}")))
+    std::env::var(key)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, format!("missing {key}")))
 }
 
 fn load_certs_from_pem(path: &str) -> Result<Vec<CertificateDer<'static>>, io::Error> {
-    let f = File::open(path)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("failed to open cert file '{path}': {e}")))?;
+    let f = File::open(path).map_err(|e| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("failed to open cert file '{path}': {e}"),
+        )
+    })?;
     let mut reader = BufReader::new(f);
     let certs = rustls_pemfile::certs(&mut reader)
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("failed to parse certs from '{path}': {e}")))?;
+        .map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("failed to parse certs from '{path}': {e}"),
+            )
+        })?;
     if certs.is_empty() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -100,13 +104,27 @@ fn load_certs_from_pem(path: &str) -> Result<Vec<CertificateDer<'static>>, io::E
 }
 
 fn load_private_key_from_pem(path: &str) -> Result<PrivateKeyDer<'static>, io::Error> {
-    let f = File::open(path)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("failed to open key file '{path}': {e}")))?;
+    let f = File::open(path).map_err(|e| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("failed to open key file '{path}': {e}"),
+        )
+    })?;
     let mut reader = BufReader::new(f);
 
     let key = rustls_pemfile::private_key(&mut reader)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("failed to parse private key from '{path}': {e}")))?
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, format!("no private key found in '{path}'")))?;
+        .map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("failed to parse private key from '{path}': {e}"),
+            )
+        })?
+        .ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("no private key found in '{path}'"),
+            )
+        })?;
     Ok(key)
 }
 
@@ -120,19 +138,32 @@ fn build_mtls_server_config() -> Result<rustls::ServerConfig, io::Error> {
 
     let mut roots = RootCertStore::empty();
     for ca in load_certs_from_pem(&queen_ca_path)? {
-        roots
-            .add(ca)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("failed to add CA cert from '{queen_ca_path}': {e}")))?;
+        roots.add(ca).map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("failed to add CA cert from '{queen_ca_path}': {e}"),
+            )
+        })?;
     }
 
     let verifier = WebPkiClientVerifier::builder(Arc::new(roots))
         .build()
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("failed to build client cert verifier: {e}")))?;
+        .map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("failed to build client cert verifier: {e}"),
+            )
+        })?;
 
     let cfg = rustls::ServerConfig::builder()
         .with_client_cert_verifier(verifier)
         .with_single_cert(server_certs, server_key)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("invalid server cert/key: {e}")))?;
+        .map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("invalid server cert/key: {e}"),
+            )
+        })?;
     Ok(cfg)
 }
 
@@ -186,9 +217,7 @@ async fn get_config(
             "agent_id": agent_id,
             "overrides": {},
         }),
-        Err(e) => {
-            return Err(api_error_db_down(&instance, format!("db read failed: {e}")))
-        }
+        Err(e) => return Err(api_error_db_down(&instance, format!("db read failed: {e}"))),
     };
 
     // 4) Return signed configuration.
@@ -222,7 +251,8 @@ async fn main() -> io::Result<()> {
         )
         .init();
 
-    let bind = std::env::var("CONFIG_SERVICE_BIND").unwrap_or_else(|_| "127.0.0.1:5004".to_string());
+    let bind =
+        std::env::var("CONFIG_SERVICE_BIND").unwrap_or_else(|_| "127.0.0.1:5004".to_string());
 
     // DB is optional at runtime; if it fails to open we still start and return 503 for requests.
     let db = match std::env::var("CONFIG_DB_PATH") {
@@ -253,13 +283,9 @@ async fn main() -> io::Result<()> {
         App::new()
             .app_data(state.clone())
             .wrap(middleware::Logger::default())
-            .service(
-                web::resource("/api/v1/config/{agent_id}")
-                    .route(web::get().to(get_config)),
-            )
+            .service(web::resource("/api/v1/config/{agent_id}").route(web::get().to(get_config)))
     })
     .bind_rustls_0_23(bind, tls_cfg)?
     .run()
     .await
 }
-

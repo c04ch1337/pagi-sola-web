@@ -1,13 +1,13 @@
 // vital_pulse_monitor/src/lib.rs
-use flate2::write::GzEncoder;
 use flate2::Compression;
+use flate2::write::GzEncoder;
 use std::fs;
 use std::fs::File;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tar::Builder;
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 
 pub struct VitalPulseMonitor {
     #[allow(dead_code)]
@@ -102,7 +102,11 @@ impl VitalPulseMonitor {
             if e.contains("stuck") || e.contains("numb") || e.contains("empty") {
                 severity = severity.max(0.8);
             }
-            if e.contains("sad") || e.contains("lonely") || e.contains("anx") || e.contains("depress") {
+            if e.contains("sad")
+                || e.contains("lonely")
+                || e.contains("anx")
+                || e.contains("depress")
+            {
                 severity = severity.max(0.6);
             }
         }

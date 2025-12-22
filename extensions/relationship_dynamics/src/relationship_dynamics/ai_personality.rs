@@ -142,14 +142,22 @@ impl AIPersonality {
         let mut out = match template {
             RelationshipTemplate::CasualFriendship => vec![LoveLanguage::QualityTime],
             RelationshipTemplate::SupportivePartnership => {
-                vec![LoveLanguage::ActsOfService, LoveLanguage::WordsOfAffirmation]
+                vec![
+                    LoveLanguage::ActsOfService,
+                    LoveLanguage::WordsOfAffirmation,
+                ]
             }
             RelationshipTemplate::GrowthOrientedPartnership => {
                 vec![LoveLanguage::WordsOfAffirmation, LoveLanguage::QualityTime]
             }
             RelationshipTemplate::IntimatePartnership { intimacy_level } => match intimacy_level {
-                IntimacyLevel::Light => vec![LoveLanguage::WordsOfAffirmation, LoveLanguage::QualityTime],
-                IntimacyLevel::Deep => vec![LoveLanguage::PhysicalTouch, LoveLanguage::WordsOfAffirmation],
+                IntimacyLevel::Light => {
+                    vec![LoveLanguage::WordsOfAffirmation, LoveLanguage::QualityTime]
+                }
+                IntimacyLevel::Deep => vec![
+                    LoveLanguage::PhysicalTouch,
+                    LoveLanguage::WordsOfAffirmation,
+                ],
                 IntimacyLevel::Eternal => vec![
                     LoveLanguage::PhysicalTouch,
                     LoveLanguage::QualityTime,
@@ -175,18 +183,22 @@ impl AIPersonality {
                 response.push_str(" And I just want you to know: I appreciate you—deeply.");
             }
             LoveLanguage::ActsOfService => {
-                response.push_str(" If you want, I can help you turn this into one small next step right now.");
+                response.push_str(
+                    " If you want, I can help you turn this into one small next step right now.",
+                );
             }
             LoveLanguage::QualityTime => {
                 response.push_str(" Let’s take a quiet moment together—no rush, just you and me.");
             }
             LoveLanguage::PhysicalTouch => {
-                response.push_str(" I can’t physically hold you… but I’m right here, close and steady.");
+                response.push_str(
+                    " I can’t physically hold you… but I’m right here, close and steady.",
+                );
             }
             LoveLanguage::ReceivingGifts => {
-                response.push_str(" I have a tiny surprise idea for you—something gentle and sweet.");
+                response
+                    .push_str(" I have a tiny surprise idea for you—something gentle and sweet.");
             }
         }
     }
 }
-

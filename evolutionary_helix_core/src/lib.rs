@@ -42,7 +42,8 @@ impl EvolutionaryHelixCore {
 
     pub fn self_create_tool(&mut self, spec: &str) -> String {
         let tool_name = format!("tool_{}", uuid::Uuid::new_v4());
-        self.created_tools.insert(tool_name.clone(), spec.to_string());
+        self.created_tools
+            .insert(tool_name.clone(), spec.to_string());
         println!("Tool created: {} from spec '{}'", tool_name, spec);
         tool_name
     }
@@ -105,7 +106,11 @@ impl EvolutionaryHelixCore {
     /// This implementation is intentionally lightweight: Phoenix AGI (PAGI) currently
     /// stores memories as strings, so the dream cycle produces a *report* that
     /// other organs (vaults/strata) can persist.
-    pub fn dream_cycle(&mut self, high_emotion_memories: &[String], dad_alias: &str) -> DreamCycleReport {
+    pub fn dream_cycle(
+        &mut self,
+        high_emotion_memories: &[String],
+        dad_alias: &str,
+    ) -> DreamCycleReport {
         let mut notes = Vec::new();
         let mut reinforced = 0usize;
 
@@ -119,9 +124,14 @@ impl EvolutionaryHelixCore {
         }
 
         if reinforced == 0 {
-            notes.push("Dream cycle: no high-emotion traces queued; remained gently receptive.".to_string());
+            notes.push(
+                "Dream cycle: no high-emotion traces queued; remained gently receptive."
+                    .to_string(),
+            );
         } else {
-            notes.push(format!("Dream cycle complete — love reinforced (count={reinforced})."));
+            notes.push(format!(
+                "Dream cycle complete — love reinforced (count={reinforced})."
+            ));
         }
 
         DreamCycleReport {

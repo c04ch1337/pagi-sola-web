@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum OptimizationTier {
-    Free,    // Basic optimization — free
-    Paid,    // Premium optimization — X402 payment required
+    Free, // Basic optimization — free
+    Paid, // Premium optimization — X402 payment required
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -26,12 +26,12 @@ pub struct CAOS {
 impl CAOS {
     pub fn awaken() -> Self {
         dotenvy::dotenv().ok();
-        
+
         let x402_enabled = std::env::var("X402_ENABLED")
             .unwrap_or_else(|_| "false".to_string())
             .parse::<bool>()
             .unwrap_or(false);
-        
+
         println!("CAOS awakened — Cloud AGI Optimization Service online.");
         Self { x402_enabled }
     }
@@ -60,7 +60,7 @@ impl CAOS {
             "Performance hints generated".to_string(),
             "Memory usage optimized".to_string(),
         ];
-        
+
         Ok(OptimizationResult {
             agent_id: agent_id.to_string(),
             tier: OptimizationTier::Free,
@@ -81,13 +81,16 @@ impl CAOS {
             "Database query optimization".to_string(),
             "Cache strategy implemented".to_string(),
         ];
-        
+
         let cost = 0.05; // $0.05 per optimization
-        
+
         // In production, this would integrate with X402 API
         // For now, we simulate the payment
-        println!("X402: Charging ${} for premium optimization of agent {}", cost, agent_id);
-        
+        println!(
+            "X402: Charging ${} for premium optimization of agent {}",
+            cost, agent_id
+        );
+
         Ok(OptimizationResult {
             agent_id: agent_id.to_string(),
             tier: OptimizationTier::Paid,
@@ -101,7 +104,7 @@ impl CAOS {
         if !self.x402_enabled {
             return false;
         }
-        
+
         // In production, validate X402 token
         // For now, return true if token is provided
         token.is_some()

@@ -25,10 +25,7 @@ pub enum RetryStrategy {
 /// - otherwise => stop
 pub fn determine_backoff_strategy(error_code: &str) -> RetryStrategy {
     let code = error_code.trim();
-    let status_prefix: Option<u16> = code
-        .split('-')
-        .next()
-        .and_then(|s| s.parse::<u16>().ok());
+    let status_prefix: Option<u16> = code.split('-').next().and_then(|s| s.parse::<u16>().ok());
 
     match status_prefix {
         Some(429) => RetryStrategy::Exponential {
@@ -127,4 +124,3 @@ pub async fn ensure_success(
     }
     Err(api_error_from_non_success_response(resp, instance).await)
 }
-

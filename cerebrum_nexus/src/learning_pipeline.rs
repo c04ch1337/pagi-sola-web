@@ -83,7 +83,10 @@ pub struct UpdateEnvelope {
 }
 
 fn is_critical_update_type(update_type: &str) -> bool {
-    matches!(update_type, "prompt_tweak" | "model_tweak" | "json_patch" | "yaml_graft")
+    matches!(
+        update_type,
+        "prompt_tweak" | "model_tweak" | "json_patch" | "yaml_graft"
+    )
 }
 
 #[derive(Debug, Clone, Default)]
@@ -138,7 +141,11 @@ impl LearningPipelineState {
         let update_type = update.update_type.as_str();
         match update_type {
             "prompt_tweak" => {
-                if let Some(s) = update.payload.get("default_prompt").and_then(|v| v.as_str()) {
+                if let Some(s) = update
+                    .payload
+                    .get("default_prompt")
+                    .and_then(|v| v.as_str())
+                {
                     self.overrides.default_prompt = Some(s.to_string());
                     self.config_json["overrides"]["default_prompt"] = json!(s);
                 }
@@ -167,9 +174,18 @@ impl LearningPipelineState {
                             return;
                         }
                         // Rehydrate known fields
-                        self.overrides.default_prompt = self.config_json["overrides"]["default_prompt"].as_str().map(|s| s.to_string());
-                        self.overrides.master_prompt = self.config_json["overrides"]["master_prompt"].as_str().map(|s| s.to_string());
-                        self.overrides.default_model = self.config_json["overrides"]["default_model"].as_str().map(|s| s.to_string());
+                        self.overrides.default_prompt =
+                            self.config_json["overrides"]["default_prompt"]
+                                .as_str()
+                                .map(|s| s.to_string());
+                        self.overrides.master_prompt =
+                            self.config_json["overrides"]["master_prompt"]
+                                .as_str()
+                                .map(|s| s.to_string());
+                        self.overrides.default_model =
+                            self.config_json["overrides"]["default_model"]
+                                .as_str()
+                                .map(|s| s.to_string());
                     }
                     Err(e) => {
                         self.last_error = Some(format!("invalid json_patch: {e}"));
@@ -218,7 +234,9 @@ pub async fn start_telemetry_loop(
     loop {
         tick.tick().await;
         let telemetrist_url = { state.lock().await.telemetrist_url.clone() };
-        let Some(base) = telemetrist_url else { continue; };
+        let Some(base) = telemetrist_url else {
+            continue;
+        };
         let endpoint = format!("{}/ingest", base.trim_end_matches('/'));
 
         let body = TelemetryEnvelope {
@@ -239,15 +257,11 @@ pub async fn start_telemetry_loop(
         match client.post(&endpoint).json(&body).send().await {
             Ok(resp) => {
                 if !resp.status().is_success() {
-                    let api_err =
-                        api_error_from_non_success_response(resp, "/ingest").await;
+                    let api_err = api_error_from_non_success_response(resp, "/ingest").await;
                     let strategy = determine_backoff_strategy(&api_err.code);
                     warn!(
                         "telemetry ingest failed status={} code={} strategy={:?} detail={}",
-                        api_err.http_status,
-                        api_err.code,
-                        strategy,
-                        api_err.detail
+                        api_err.http_status, api_err.code, strategy, api_err.detail
                     );
                 }
             }
@@ -317,12 +331,10 @@ pub async fn start_update_subscription_loop(
                                         Some(s) if !s.trim().is_empty() => s,
                                         _ => {
                                             let mut guard = state.lock().await;
-                                            guard.last_error = Some(
-                                                format!(
-                                                    "blocked unsigned critical update (type={})",
-                                                    update.update_type
-                                                ),
-                                            );
+                                            guard.last_error = Some(format!(
+                                                "blocked unsigned critical update (type={})",
+                                                update.update_type
+                                            ));
                                             continue;
                                         }
                                     };
@@ -340,7 +352,8 @@ pub async fn start_update_subscription_loop(
                                     };
 
                                     // Prefer verifying over sender-provided raw payload bytes.
-                                    let signed_payload: Vec<u8> = if let Some(pb64) = update.payload_b64.as_deref()
+                                    let signed_payload: Vec<u8> = if let Some(pb64) =
+                                        update.payload_b64.as_deref()
                                     {
                                         match decode_b64(pb64) {
                                             Ok(b) => b,
@@ -397,7 +410,9 @@ pub async fn start_update_subscription_loop(
                             }
                         }
                         Ok(tokio_tungstenite::tungstenite::Message::Ping(p)) => {
-                            let _ = ws.send(tokio_tungstenite::tungstenite::Message::Pong(p)).await;
+                            let _ = ws
+                                .send(tokio_tungstenite::tungstenite::Message::Pong(p))
+                                .await;
                         }
                         Ok(tokio_tungstenite::tungstenite::Message::Close(_)) => break,
                         Ok(_) => {}
@@ -417,4 +432,3 @@ pub async fn start_update_subscription_loop(
         backoff = (backoff * 2).min(Duration::from_secs(60));
     }
 }
-

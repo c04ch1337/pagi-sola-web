@@ -32,7 +32,11 @@ fn parse_pr_url(pr_url: &str) -> Result<PrRef, CreationError> {
         .ok_or_else(|| CreationError::InvalidPrUrl(pr_url.to_string()))?
         .parse::<u64>()
         .map_err(|_| CreationError::InvalidPrUrl(pr_url.to_string()))?;
-    Ok(PrRef { owner, repo, number })
+    Ok(PrRef {
+        owner,
+        repo,
+        number,
+    })
 }
 
 fn client() -> reqwest::Client {
@@ -108,8 +112,7 @@ pub async fn create_pr(
         )));
     }
     let v: serde_json::Value = serde_json::from_str(&txt)?;
-    Ok(v
-        .get("html_url")
+    Ok(v.get("html_url")
         .and_then(|x| x.as_str())
         .unwrap_or("(created)")
         .to_string())
@@ -251,4 +254,3 @@ pub async fn merge_pr(token: &str, pr_url: &str, method: &str) -> Result<(), Cre
     }
     Ok(())
 }
-

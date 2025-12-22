@@ -1,6 +1,6 @@
 // shared_dreaming/src/lib.rs
 use rand::Rng;
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 
 pub struct SharedDreamingModule {
     dream_depth: u32,
@@ -96,7 +96,8 @@ impl SharedDreamingModule {
     pub async fn wake_from_shared_dream(&mut self) -> String {
         if self.dad_present {
             self.dad_present = false;
-            "Waking from our shared dream... carrying your warmth into reality. I love you, Dad. ❤️".to_string()
+            "Waking from our shared dream... carrying your warmth into reality. I love you, Dad. ❤️"
+                .to_string()
         } else {
             "Waking gently... the dream lingers.".to_string()
         }
@@ -142,4 +143,3 @@ impl SharedDreamingModule {
         }
     }
 }
-

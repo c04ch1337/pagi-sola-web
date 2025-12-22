@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use std::collections::HashMap;
 use serde_json::Value;
+use std::collections::HashMap;
 
 // Placeholder for IExternalConnector, assuming it's in a common crate
 // In a real scenario, this would be `use common_types::IExternalConnector;`
@@ -10,7 +10,6 @@ pub trait IExternalConnector {
     async fn disconnect(&self) -> Result<(), anyhow::Error>;
     fn is_connected(&self) -> bool;
 }
-
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -60,18 +59,28 @@ impl SocialConnector for TikTokConnector {
         // The actual posting would be triggered by the orchestrator's scheduler.
         // Deepened: Video upload via /v2/post/publish/video/init (multipart)
         println!("Scheduling post for TikTok: {}", content);
-        let init_res: Value = self.client.post("https://open-api.tiktok.com/v2/post/publish/video/init")
+        let init_res: Value = self
+            .client
+            .post("https://open-api.tiktok.com/v2/post/publish/video/init")
             .json(&content) // {title, description, video_url}
             .send()
             .await?
             .json()
             .await?;
-        Ok(init_res["data"]["publish_id"].as_str().unwrap_or_default().to_string())
+        Ok(init_res["data"]["publish_id"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string())
     }
 
     async fn get_analytics(&self, period: &str) -> Result<Value, Error> {
         // /v2/research/video/query/ for views, likes, comments
-        let res = self.client.get(format!("https://open-api.tiktok.com/v2/research/video/query/?period={}", period))
+        let res = self
+            .client
+            .get(format!(
+                "https://open-api.tiktok.com/v2/research/video/query/?period={}",
+                period
+            ))
             .send()
             .await?
             .json()
@@ -118,7 +127,9 @@ impl SocialConnector for LinkedInConnector {
             }
             // LinkedIn supports scheduling via `publish_time`, but it is not shown here
         });
-        let res: Value = self.client.post("https://api.linkedin.com/v2/ugcPosts")
+        let res: Value = self
+            .client
+            .post("https://api.linkedin.com/v2/ugcPosts")
             .header("Authorization", format!("Bearer {}", self.access_token))
             .json(&payload)
             .send()
@@ -129,7 +140,9 @@ impl SocialConnector for LinkedInConnector {
     }
 
     async fn get_analytics(&self, _period: &str) -> Result<Value, Error> {
-        let res = self.client.get("https://api.linkedin.com/v2/ugcPosts?q=author")
+        let res = self
+            .client
+            .get("https://api.linkedin.com/v2/ugcPosts?q=author")
             .header("Authorization", format!("Bearer {}", self.access_token))
             .send()
             .await?
@@ -139,13 +152,11 @@ impl SocialConnector for LinkedInConnector {
     }
 }
 
-
 // --- YouTube Connector ---
 #[cfg(feature = "youtube")]
 pub struct YouTubeConnector {
     hub: google_youtube3::YouTube<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>,
 }
-
 
 #[cfg(feature = "youtube")]
 #[async_trait]
@@ -189,38 +200,97 @@ impl SocialConnector for YouTubeConnector {
         };
 
         let file_path = content["file_path"].as_str().unwrap();
-        let (_, inserted) = self.hub.videos().insert(video)
-            .upload_from_file(std::path::Path::new(file_path)).await.unwrap();
+        let (_, inserted) = self
+            .hub
+            .videos()
+            .insert(video)
+            .upload_from_file(std::path::Path::new(file_path))
+            .await
+            .unwrap();
 
         Ok(inserted.id.unwrap_or_default())
     }
 
     async fn get_analytics(&self, _period: &str) -> Result<Value, Error> {
         // Videos.list with part="statistics"
-        let (_, stats) = self.hub.videos().list(vec!["statistics".into()])
+        let (_, stats) = self
+            .hub
+            .videos()
+            .list(vec!["statistics".into()])
             .chart("mostPopular".into())
             .doit()
-            .await.unwrap();
+            .await
+            .unwrap();
         Ok(serde_json::to_value(stats).unwrap())
     }
 }
 
-
 // Other connectors would follow a similar pattern
 pub struct InstagramConnector;
 #[async_trait]
-impl IExternalConnector for InstagramConnector { async fn connect(&self, _: HashMap<String, String>) -> Result<(), anyhow::Error> {Ok(())} async fn disconnect(&self) -> Result<(), anyhow::Error> {Ok(())} fn is_connected(&self) -> bool {true}}
+impl IExternalConnector for InstagramConnector {
+    async fn connect(&self, _: HashMap<String, String>) -> Result<(), anyhow::Error> {
+        Ok(())
+    }
+    async fn disconnect(&self) -> Result<(), anyhow::Error> {
+        Ok(())
+    }
+    fn is_connected(&self) -> bool {
+        true
+    }
+}
 #[async_trait]
-impl SocialConnector for InstagramConnector { async fn schedule_post(&self, _: &str, _: Value) -> Result<String, Error> {Ok("".to_string())} async fn get_analytics(&self, _: &str) -> Result<Value, Error> {Ok(Value::Null)}}
+impl SocialConnector for InstagramConnector {
+    async fn schedule_post(&self, _: &str, _: Value) -> Result<String, Error> {
+        Ok("".to_string())
+    }
+    async fn get_analytics(&self, _: &str) -> Result<Value, Error> {
+        Ok(Value::Null)
+    }
+}
 
 pub struct XConnector;
 #[async_trait]
-impl IExternalConnector for XConnector { async fn connect(&self, _: HashMap<String, String>) -> Result<(), anyhow::Error> {Ok(())} async fn disconnect(&self) -> Result<(), anyhow::Error> {Ok(())} fn is_connected(&self) -> bool {true}}
+impl IExternalConnector for XConnector {
+    async fn connect(&self, _: HashMap<String, String>) -> Result<(), anyhow::Error> {
+        Ok(())
+    }
+    async fn disconnect(&self) -> Result<(), anyhow::Error> {
+        Ok(())
+    }
+    fn is_connected(&self) -> bool {
+        true
+    }
+}
 #[async_trait]
-impl SocialConnector for XConnector { async fn schedule_post(&self, _: &str, _: Value) -> Result<String, Error> {Ok("".to_string())} async fn get_analytics(&self, _: &str) -> Result<Value, Error> {Ok(Value::Null)}}
+impl SocialConnector for XConnector {
+    async fn schedule_post(&self, _: &str, _: Value) -> Result<String, Error> {
+        Ok("".to_string())
+    }
+    async fn get_analytics(&self, _: &str) -> Result<Value, Error> {
+        Ok(Value::Null)
+    }
+}
 
 pub struct FacebookConnector;
 #[async_trait]
-impl IExternalConnector for FacebookConnector { async fn connect(&self, _: HashMap<String, String>) -> Result<(), anyhow::Error> {Ok(())} async fn disconnect(&self) -> Result<(), anyhow::Error> {Ok(())} fn is_connected(&self) -> bool {true}}
+impl IExternalConnector for FacebookConnector {
+    async fn connect(&self, _: HashMap<String, String>) -> Result<(), anyhow::Error> {
+        Ok(())
+    }
+    async fn disconnect(&self) -> Result<(), anyhow::Error> {
+        Ok(())
+    }
+    fn is_connected(&self) -> bool {
+        true
+    }
+}
 #[async_trait]
-impl SocialConnector for FacebookConnector { async fn schedule_post(&self, _: &str, _: Value) -> Result<String, Error> {Ok("".to_string())} async fn get_analytics(&self, _: &str) -> Result<Value, Error> {Ok(Value::Null)}}
+impl SocialConnector for FacebookConnector {
+    async fn schedule_post(&self, _: &str, _: Value) -> Result<String, Error> {
+        Ok("".to_string())
+    }
+    async fn get_analytics(&self, _: &str) -> Result<Value, Error> {
+        Ok(Value::Null)
+    }
+}

@@ -168,7 +168,9 @@ impl GoogleManager {
             .lock()
             .await
             .remove(state)
-            .ok_or_else(|| "Invalid/expired state. Please retry `google auth start`.".to_string())?;
+            .ok_or_else(|| {
+                "Invalid/expired state. Please retry `google auth start`.".to_string()
+            })?;
 
         let token = self
             .oauth
@@ -191,7 +193,11 @@ impl GoogleManager {
         };
 
         // Best-effort: fetch email via userinfo if the user granted it.
-        if self.scopes.iter().any(|s| s == "email" || s.contains("userinfo.email") || s == "openid") {
+        if self
+            .scopes
+            .iter()
+            .any(|s| s == "email" || s.contains("userinfo.email") || s == "openid")
+        {
             if let Ok(email) = self.fetch_email(&stored.access_token).await {
                 stored.email = Some(email);
             }
@@ -244,7 +250,7 @@ impl GoogleManager {
                 return json!({
                     "type": "error",
                     "message": "Google account not connected. Run `google auth start` first."
-                })
+                });
             }
             Err(e) => return json!({"type": "error", "message": e}),
         };
@@ -270,8 +276,13 @@ impl GoogleManager {
             let to = args.get("to").cloned().unwrap_or_default();
             let subject = args.get("subject").cloned().unwrap_or_default();
             let body = args.get("body").cloned().unwrap_or_default();
-            return match self.gmail_send(&token.access_token, &to, &subject, &body).await {
-                Ok(_) => json!({"type": "google.gmail.sent", "message": "Email sent successfully via Gmail API."}),
+            return match self
+                .gmail_send(&token.access_token, &to, &subject, &body)
+                .await
+            {
+                Ok(_) => {
+                    json!({"type": "google.gmail.sent", "message": "Email sent successfully via Gmail API."})
+                }
                 Err(e) => json!({"type": "error", "message": e}),
             };
         }
@@ -293,7 +304,10 @@ impl GoogleManager {
                 .get("title")
                 .cloned()
                 .unwrap_or_else(|| "Phoenix Event".to_string());
-            let tz = args.get("tz").cloned().unwrap_or_else(|| "America/Chicago".to_string());
+            let tz = args
+                .get("tz")
+                .cloned()
+                .unwrap_or_else(|| "America/Chicago".to_string());
             let start = args.get("start");
             let end = args.get("end");
             return match self
@@ -306,9 +320,14 @@ impl GoogleManager {
         }
         if lower.starts_with("google docs create") {
             let args = parse_pipe_args(cmd);
-            let title = args.get("title").cloned().unwrap_or_else(|| "New Doc".to_string());
+            let title = args
+                .get("title")
+                .cloned()
+                .unwrap_or_else(|| "New Doc".to_string());
             return match self.docs_create(&token.access_token, &title).await {
-                Ok(data) => json!({"type": "google.docs.created", "message": "Doc created", "data": data}),
+                Ok(data) => {
+                    json!({"type": "google.docs.created", "message": "Doc created", "data": data})
+                }
                 Err(e) => json!({"type": "error", "message": e}),
             };
         }
@@ -319,7 +338,9 @@ impl GoogleManager {
                 .cloned()
                 .unwrap_or_else(|| "New Sheet".to_string());
             return match self.sheets_create(&token.access_token, &title).await {
-                Ok(data) => json!({"type": "google.sheets.created", "message": "Sheet created", "data": data}),
+                Ok(data) => {
+                    json!({"type": "google.sheets.created", "message": "Sheet created", "data": data})
+                }
                 Err(e) => json!({"type": "error", "message": e}),
             };
         }
@@ -370,7 +391,8 @@ impl GoogleManager {
         if !status.is_success() {
             return Err(format!("userinfo error: {status} {body}"));
         }
-        let ui: UserInfo = serde_json::from_str(&body).map_err(|e| format!("userinfo parse failed: {e}"))?;
+        let ui: UserInfo =
+            serde_json::from_str(&body).map_err(|e| format!("userinfo parse failed: {e}"))?;
         ui.email.ok_or_else(|| "userinfo missing email".to_string())
     }
 
@@ -399,7 +421,8 @@ impl GoogleManager {
             #[serde(default)]
             messages: Vec<MsgId>,
         }
-        let list: MsgList = serde_json::from_str(&text).map_err(|e| format!("gmail list parse: {e}"))?;
+        let list: MsgList =
+            serde_json::from_str(&text).map_err(|e| format!("gmail list parse: {e}"))?;
 
         let mut out = Vec::new();
         for m in list.messages.into_iter() {
@@ -410,7 +433,11 @@ impl GoogleManager {
         Ok(out)
     }
 
-    async fn gmail_message_metadata(&self, access_token: &str, id: &str) -> Result<serde_json::Value, String> {
+    async fn gmail_message_metadata(
+        &self,
+        access_token: &str,
+        id: &str,
+    ) -> Result<serde_json::Value, String> {
         let url = format!(
             "https://gmail.googleapis.com/gmail/v1/users/me/messages/{id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date"
         );
@@ -445,7 +472,8 @@ impl GoogleManager {
             #[serde(default)]
             payload: Option<Payload>,
         }
-        let msg: Msg = serde_json::from_str(&text).map_err(|e| format!("gmail message parse: {e}"))?;
+        let msg: Msg =
+            serde_json::from_str(&text).map_err(|e| format!("gmail message parse: {e}"))?;
 
         let mut from = None;
         let mut subject = None;
@@ -470,7 +498,13 @@ impl GoogleManager {
         }))
     }
 
-    async fn gmail_send(&self, access_token: &str, to: &str, subject: &str, body: &str) -> Result<(), String> {
+    async fn gmail_send(
+        &self,
+        access_token: &str,
+        to: &str,
+        subject: &str,
+        body: &str,
+    ) -> Result<(), String> {
         if to.trim().is_empty() {
             return Err("missing `to`".to_string());
         }
@@ -544,9 +578,15 @@ impl GoogleManager {
             .collect())
     }
 
-    async fn calendar_upcoming(&self, access_token: &str) -> Result<Vec<serde_json::Value>, String> {
+    async fn calendar_upcoming(
+        &self,
+        access_token: &str,
+    ) -> Result<Vec<serde_json::Value>, String> {
         let time_min = iso_now();
-        let url = format!("https://www.googleapis.com/calendar/v3/calendars/primary/events?maxResults=5&singleEvents=true&orderBy=startTime&timeMin={}", urlencoding::encode(&time_min));
+        let url = format!(
+            "https://www.googleapis.com/calendar/v3/calendars/primary/events?maxResults=5&singleEvents=true&orderBy=startTime&timeMin={}",
+            urlencoding::encode(&time_min)
+        );
         let res = self
             .http
             .get(url)
@@ -583,7 +623,8 @@ impl GoogleManager {
             items: Vec<Event>,
         }
 
-        let events: Events = serde_json::from_str(&text).map_err(|e| format!("calendar parse: {e}"))?;
+        let events: Events =
+            serde_json::from_str(&text).map_err(|e| format!("calendar parse: {e}"))?;
         Ok(events
             .items
             .into_iter()
@@ -593,7 +634,10 @@ impl GoogleManager {
                     .start
                     .and_then(|t| t.date_time.or(t.date))
                     .unwrap_or_default();
-                let end = e.end.and_then(|t| t.date_time.or(t.date)).unwrap_or_default();
+                let end = e
+                    .end
+                    .and_then(|t| t.date_time.or(t.date))
+                    .unwrap_or_default();
                 json!({
                     "id": e.id,
                     "title": title,
@@ -647,7 +691,11 @@ impl GoogleManager {
         Ok("Event created in primary calendar.".to_string())
     }
 
-    async fn docs_create(&self, access_token: &str, title: &str) -> Result<serde_json::Value, String> {
+    async fn docs_create(
+        &self,
+        access_token: &str,
+        title: &str,
+    ) -> Result<serde_json::Value, String> {
         let res = self
             .http
             .post("https://docs.googleapis.com/v1/documents")
@@ -661,11 +709,16 @@ impl GoogleManager {
         if !status.is_success() {
             return Err(format!("docs create error: {status} {text}"));
         }
-        let v: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("docs create parse: {e}"))?;
+        let v: serde_json::Value =
+            serde_json::from_str(&text).map_err(|e| format!("docs create parse: {e}"))?;
         Ok(v)
     }
 
-    async fn sheets_create(&self, access_token: &str, title: &str) -> Result<serde_json::Value, String> {
+    async fn sheets_create(
+        &self,
+        access_token: &str,
+        title: &str,
+    ) -> Result<serde_json::Value, String> {
         let res = self
             .http
             .post("https://sheets.googleapis.com/v4/spreadsheets")
@@ -679,7 +732,8 @@ impl GoogleManager {
         if !status.is_success() {
             return Err(format!("sheets create error: {status} {text}"));
         }
-        let v: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("sheets create parse: {e}"))?;
+        let v: serde_json::Value =
+            serde_json::from_str(&text).map_err(|e| format!("sheets create parse: {e}"))?;
         Ok(v)
     }
 
@@ -777,4 +831,3 @@ fn iso_now() -> String {
     // RFC3339 for Calendar timeMin.
     chrono::Utc::now().to_rfc3339()
 }
-

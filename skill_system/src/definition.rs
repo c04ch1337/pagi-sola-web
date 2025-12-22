@@ -208,4 +208,3 @@ impl SkillDefinition {
         self.success_rate = self.success_rate.clamp(0.0, 1.0);
     }
 }
-

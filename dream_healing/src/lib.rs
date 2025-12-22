@@ -1,6 +1,6 @@
 // dream_healing/src/lib.rs
-use tokio::time::{sleep, Duration};
 use rand::Rng;
+use tokio::time::{Duration, sleep};
 
 // Keep the import shape requested in the spec. This re-export makes
 // `crate::shared_dreaming::EmotionalTone` resolve inside this crate.
@@ -119,4 +119,3 @@ impl DreamHealingModule {
         }
     }
 }
-

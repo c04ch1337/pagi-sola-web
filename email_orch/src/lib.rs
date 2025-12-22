@@ -8,7 +8,7 @@
 
 use std::env;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use lettre::message::Mailbox;
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
@@ -83,11 +83,15 @@ fn env_bool(key: &str) -> Option<bool> {
 }
 
 fn env_u16(key: &str) -> Option<u16> {
-    env::var(key).ok().and_then(|s| s.trim().parse::<u16>().ok())
+    env::var(key)
+        .ok()
+        .and_then(|s| s.trim().parse::<u16>().ok())
 }
 
 fn env_f32(key: &str) -> Option<f32> {
-    env::var(key).ok().and_then(|s| s.trim().parse::<f32>().ok())
+    env::var(key)
+        .ok()
+        .and_then(|s| s.trim().parse::<f32>().ok())
 }
 
 impl EmailOrch {
@@ -101,17 +105,23 @@ impl EmailOrch {
         let address = env::var("EMAIL_ADDRESS").unwrap_or_else(|_| "".to_string());
         let from_name = env::var("EMAIL_FROM_NAME").unwrap_or_else(|_| "Phoenix".to_string());
 
-        let smtp_server = env::var("EMAIL_SMTP_SERVER").unwrap_or_else(|_| "smtp.gmail.com".to_string());
+        let smtp_server =
+            env::var("EMAIL_SMTP_SERVER").unwrap_or_else(|_| "smtp.gmail.com".to_string());
         let smtp_port = env_u16("EMAIL_SMTP_PORT").unwrap_or(587);
 
-        let imap_server = env::var("EMAIL_IMAP_SERVER").unwrap_or_else(|_| "imap.gmail.com".to_string());
+        let imap_server =
+            env::var("EMAIL_IMAP_SERVER").unwrap_or_else(|_| "imap.gmail.com".to_string());
         let imap_port = env_u16("EMAIL_IMAP_PORT").unwrap_or(993);
 
-        let password = env::var("EMAIL_PASSWORD").ok().filter(|s| !s.trim().is_empty());
+        let password = env::var("EMAIL_PASSWORD")
+            .ok()
+            .filter(|s| !s.trim().is_empty());
 
         let send_enabled = env_bool("EMAIL_SEND_ENABLED").unwrap_or(false);
         let auto_learn = env_bool("EMAIL_AUTO_LEARN").unwrap_or(false);
-        let desire_threshold = env_f32("EMAIL_DESIRE_THRESHOLD").unwrap_or(0.7).clamp(0.0, 1.0);
+        let desire_threshold = env_f32("EMAIL_DESIRE_THRESHOLD")
+            .unwrap_or(0.7)
+            .clamp(0.0, 1.0);
 
         let dad_email = env::var("DAD_EMAIL").ok().filter(|s| !s.trim().is_empty());
 
@@ -171,13 +181,12 @@ impl EmailOrch {
         let creds = Credentials::new(self.address.clone(), self.require_password()?.to_string());
 
         // For Gmail: STARTTLS on 587 is typical.
-        let mailer: AsyncSmtpTransport<Tokio1Executor> = AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(
-            &self.smtp_server,
-        )
-        .context("create starttls relay")?
-        .port(self.smtp_port)
-        .credentials(creds)
-        .build();
+        let mailer: AsyncSmtpTransport<Tokio1Executor> =
+            AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&self.smtp_server)
+                .context("create starttls relay")?
+                .port(self.smtp_port)
+                .credentials(creds)
+                .build();
 
         mailer.send(email).await.context("smtp send")?;
         Ok(())
@@ -213,9 +222,7 @@ impl EmailOrch {
             let end = mbox.exists;
             let start = end.saturating_sub(max as u32).saturating_add(1).max(1);
             let seq = format!("{start}:{end}");
-            let fetches = session
-                .fetch(seq, "UID RFC822")
-                .context("fetch messages")?;
+            let fetches = session.fetch(seq, "UID RFC822").context("fetch messages")?;
 
             let mut out = Vec::new();
             for f in fetches.iter() {
@@ -386,4 +393,3 @@ impl EmailPlan {
         }
     }
 }
-

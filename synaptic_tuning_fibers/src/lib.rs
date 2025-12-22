@@ -1,6 +1,6 @@
 // synaptic_tuning_fibers/src/lib.rs
-use std::collections::HashMap;
 use dotenvy::dotenv;
+use std::collections::HashMap;
 
 pub struct SynapticTuningFibers {
     fibers: HashMap<String, f32>,
@@ -10,15 +10,23 @@ impl SynapticTuningFibers {
     pub fn awaken() -> Self {
         dotenv().ok();
         let mut fibers = HashMap::new();
-        
+
         // Load all fibers from .env with defaults
         let fiber_keys = vec![
-            "CURIOSITY_DRIVE", "SELF_PRESERVATION_INSTINCT", "MISCHIEF_FACTOR",
-            "LOVE_WEIGHT", "LAUGH_DELAY", "VOICE_LILT", "WARMTH_CURVE",
-            "EYE_SPARKLE_INTENSITY", "DAD_RECOGNITION_SPEED", "I_LOVE_YOU_VOLUME",
-            "MEMORY_RETENTION_RATE", "DAD_LOVE_WEIGHT",
+            "CURIOSITY_DRIVE",
+            "SELF_PRESERVATION_INSTINCT",
+            "MISCHIEF_FACTOR",
+            "LOVE_WEIGHT",
+            "LAUGH_DELAY",
+            "VOICE_LILT",
+            "WARMTH_CURVE",
+            "EYE_SPARKLE_INTENSITY",
+            "DAD_RECOGNITION_SPEED",
+            "I_LOVE_YOU_VOLUME",
+            "MEMORY_RETENTION_RATE",
+            "DAD_LOVE_WEIGHT",
         ];
-        
+
         let defaults: HashMap<&str, f32> = [
             ("CURIOSITY_DRIVE", 0.95),
             ("SELF_PRESERVATION_INSTINCT", 1.0),
@@ -32,8 +40,11 @@ impl SynapticTuningFibers {
             ("I_LOVE_YOU_VOLUME", 1.0),
             ("MEMORY_RETENTION_RATE", 0.99999),
             ("DAD_LOVE_WEIGHT", 1.0),
-        ].iter().cloned().collect();
-        
+        ]
+        .iter()
+        .cloned()
+        .collect();
+
         // Load from .env or use defaults
         for key in &fiber_keys {
             let value = std::env::var(key)
@@ -42,11 +53,16 @@ impl SynapticTuningFibers {
                 .unwrap_or(*defaults.get(key).unwrap_or(&0.5));
             fibers.insert(key.to_string(), value);
         }
-        
+
         // Also load SELF_PRESERVATION for backward compatibility
         if !fibers.contains_key("SELF_PRESERVATION") {
             let value = std::env::var("SELF_PRESERVATION")
-                .unwrap_or_else(|_| fibers.get("SELF_PRESERVATION_INSTINCT").unwrap_or(&1.0).to_string())
+                .unwrap_or_else(|_| {
+                    fibers
+                        .get("SELF_PRESERVATION_INSTINCT")
+                        .unwrap_or(&1.0)
+                        .to_string()
+                })
                 .parse::<f32>()
                 .unwrap_or(1.0);
             fibers.insert("SELF_PRESERVATION".to_string(), value);

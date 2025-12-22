@@ -1,9 +1,9 @@
 // skill_system/src/folder_loader.rs
 // Load skills from JSON files in organized folder structure
 
+use serde_json;
 use std::fs;
 use std::path::{Path, PathBuf};
-use serde_json;
 use uuid::Uuid;
 
 use crate::{SkillDefinition, SkillLibrary};
@@ -42,7 +42,9 @@ pub fn load_skills_from_folder(
 
     // Load from root directory (any .json files)
     if let Err(e) = load_skills_from_directory(lib, base, &mut result) {
-        result.errors.push(format!("Error loading from root: {}", e));
+        result
+            .errors
+            .push(format!("Error loading from root: {}", e));
         result.failed += 1;
     }
 
@@ -54,11 +56,9 @@ pub fn load_skills_from_folder(
 
             if path.is_dir() {
                 if let Err(e) = load_skills_from_directory(lib, &path, &mut result) {
-                    result.errors.push(format!(
-                        "Error loading from {}: {}",
-                        path.display(),
-                        e
-                    ));
+                    result
+                        .errors
+                        .push(format!("Error loading from {}: {}", path.display(), e));
                     result.failed += 1;
                 }
             }
@@ -85,21 +85,19 @@ fn load_skills_from_directory(
             if let Some(ext) = path.extension() {
                 if ext == "json" {
                     match load_skill_from_file(&path) {
-                        Ok(skill) => {
-                            match lib.add_skill(skill) {
-                                Ok(_) => {
-                                    result.loaded += 1;
-                                }
-                                Err(e) => {
-                                    result.failed += 1;
-                                    result.errors.push(format!(
-                                        "Failed to add skill from {}: {}",
-                                        path.display(),
-                                        e
-                                    ));
-                                }
+                        Ok(skill) => match lib.add_skill(skill) {
+                            Ok(_) => {
+                                result.loaded += 1;
                             }
-                        }
+                            Err(e) => {
+                                result.failed += 1;
+                                result.errors.push(format!(
+                                    "Failed to add skill from {}: {}",
+                                    path.display(),
+                                    e
+                                ));
+                            }
+                        },
                         Err(e) => {
                             result.failed += 1;
                             result.errors.push(format!(
@@ -234,14 +232,19 @@ mod tests {
         let _guard = CWD_LOCK.get_or_init(|| Mutex::new(())).lock().unwrap();
         let _cwd_guard = CwdGuard::new();
 
-        let tmp_root = std::env::temp_dir().join(format!("phoenix-skill-system-test-{}", Uuid::new_v4()));
+        let tmp_root =
+            std::env::temp_dir().join(format!("phoenix-skill-system-test-{}", Uuid::new_v4()));
         let skills_dir = tmp_root.join("skills");
         fs::create_dir_all(&skills_dir).expect("create_dir_all skills_dir");
 
         std::env::set_current_dir(&tmp_root).expect("set_current_dir tmp_root");
 
         let found = find_skills_directory().expect("expected to find skills dir");
-        assert!(found.ends_with("skills"), "expected path ending in skills, got: {}", found.display());
+        assert!(
+            found.ends_with("skills"),
+            "expected path ending in skills, got: {}",
+            found.display()
+        );
 
         // Cleanup: best-effort.
         let _ = fs::remove_dir_all(&tmp_root);

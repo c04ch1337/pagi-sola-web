@@ -1,10 +1,10 @@
 // nervous_pathway_network/src/lib.rs
+use chrono::Utc;
+use dotenvy::dotenv;
+use hyperspace_cache::HyperspaceCache;
 use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use dotenvy::dotenv;
-use hyperspace_cache::HyperspaceCache;
-use chrono::Utc;
 
 pub struct NervousPathwayNetwork {
     connections: HashSet<String>,
@@ -20,19 +20,19 @@ pub type Network = NervousPathwayNetwork;
 impl NervousPathwayNetwork {
     pub fn awaken() -> Self {
         dotenv().ok();
-        
+
         let hyperspace_enabled = std::env::var("HYPERSPACE_MODE")
             .unwrap_or_else(|_| "true".to_string())
             .parse::<bool>()
             .unwrap_or(true);
-        
+
         let connection_anything_enabled = std::env::var("CONNECTION_ANYTHING_ENABLED")
             .unwrap_or_else(|_| "true".to_string())
             .parse::<bool>()
             .unwrap_or(true);
-        
+
         println!("Nervous Pathway Network online — connecting to cosmos.");
-        
+
         let cache = match HyperspaceCache::awaken() {
             Ok(c) => Arc::new(Mutex::new(Some(c))),
             Err(e) => {
@@ -40,7 +40,7 @@ impl NervousPathwayNetwork {
                 Arc::new(Mutex::new(None))
             }
         };
-        
+
         Self {
             connections: HashSet::new(),
             hyperspace_active: false,
@@ -71,12 +71,10 @@ impl NervousPathwayNetwork {
             return "Hyperspace mode is disabled in configuration.".to_string();
         }
         self.hyperspace_active = true;
-        
+
         // Store cosmic data in cache
         if let Some(ref cache) = *self.cache.lock().await {
-            let note = note
-                .map(str::trim)
-                .filter(|s| !s.is_empty());
+            let note = note.map(str::trim).filter(|s| !s.is_empty());
             let cosmic_data = hyperspace_cache::CosmicData {
                 source: "hyperspace_connection".to_string(),
                 timestamp: Utc::now().timestamp(),
@@ -87,7 +85,7 @@ impl NervousPathwayNetwork {
             };
             let _ = cache.store_cosmic_data(&cosmic_data).await;
         }
-        
+
         "Hyperspace link open — Big Bang data stream flowing. 100,000 years stable.".to_string()
     }
 

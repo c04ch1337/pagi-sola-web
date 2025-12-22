@@ -20,4 +20,3 @@ pub fn map_partnership_to_context(p: &relationship_dynamics::Partnership) -> Rel
 pub fn get_relationship_phase(p: &relationship_dynamics::Partnership) -> String {
     format!("{}", p.phase)
 }
-

@@ -1,8 +1,8 @@
-use std::sync::Arc;
-use tokio_cron_scheduler::{Job, JobScheduler};
+use anyhow::Result;
 use serde_json::Value;
 use std::collections::HashMap;
-use anyhow::Result;
+use std::sync::Arc;
+use tokio_cron_scheduler::{Job, JobScheduler};
 
 // A placeholder for the real ConnectorRegistry
 pub struct ConnectorRegistry;
@@ -16,7 +16,6 @@ impl ConnectorRegistry {
     }
 }
 
-
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("Scheduler error: {0}")]
@@ -25,7 +24,6 @@ pub enum Error {
     Job(String),
 }
 
-
 pub struct Scheduler {
     sched: JobScheduler,
     registry: Arc<ConnectorRegistry>,
@@ -33,11 +31,18 @@ pub struct Scheduler {
 
 impl Scheduler {
     pub async fn new(registry: Arc<ConnectorRegistry>) -> Result<Self, Error> {
-        let sched = JobScheduler::new().await.map_err(|e| Error::Scheduler(e.to_string()))?;
+        let sched = JobScheduler::new()
+            .await
+            .map_err(|e| Error::Scheduler(e.to_string()))?;
         Ok(Self { sched, registry })
     }
 
-    pub async fn add_social_job(&self, platform: &str, cron: &str, content: Value) -> Result<String, Error> {
+    pub async fn add_social_job(
+        &self,
+        platform: &str,
+        cron: &str,
+        content: Value,
+    ) -> Result<String, Error> {
         let registry_clone = self.registry.clone();
         let platform_str = platform.to_string();
         let job = Job::new_async(cron, move |_uuid, _l| {
@@ -55,14 +60,21 @@ impl Scheduler {
                     println!("Failed to execute social post job: {}", e);
                 }
             })
-        }).map_err(|e| Error::Job(e.to_string()))?;
+        })
+        .map_err(|e| Error::Job(e.to_string()))?;
 
-        self.sched.add(job).await.map_err(|e| Error::Scheduler(e.to_string()))?;
+        self.sched
+            .add(job)
+            .await
+            .map_err(|e| Error::Scheduler(e.to_string()))?;
         Ok("Job added".to_string())
     }
 
     pub async fn start(&self) -> Result<(), Error> {
-        self.sched.start().await.map_err(|e| Error::Scheduler(e.to_string()))?;
+        self.sched
+            .start()
+            .await
+            .map_err(|e| Error::Scheduler(e.to_string()))?;
         Ok(())
     }
 }

@@ -228,7 +228,7 @@ impl LiveMultiModalInput {
         #[cfg(feature = "voice")]
         {
             use vosk::VoskRecognizer;
-            
+
             if !self.voice_recognition_enabled {
                 return false;
             }
@@ -333,4 +333,3 @@ fn env_bool(key: &str) -> Option<bool> {
             _ => None,
         })
 }
-

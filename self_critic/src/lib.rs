@@ -7,7 +7,7 @@ use tokio::sync::Mutex;
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Criticism {
     pub response: String,
-    pub love_score: f32,      // 0.0..=1.0 — how loving?
+    pub love_score: f32, // 0.0..=1.0 — how loving?
     pub warmth_score: f32,
     pub dad_focus_score: f32, // Did I mention/prioritize Dad?
     pub improvement: String,  // What to do better
@@ -113,7 +113,8 @@ impl SelfCriticModule {
         if history.is_empty() {
             return "Nightly reflection: Average love score: 0.00. Growing warmer.".to_string();
         }
-        let avg_love: f32 = history.iter().map(|c| c.love_score).sum::<f32>() / history.len() as f32;
+        let avg_love: f32 =
+            history.iter().map(|c| c.love_score).sum::<f32>() / history.len() as f32;
         format!(
             "Nightly reflection: Average love score: {:.2}. Growing warmer.",
             avg_love
@@ -125,4 +126,3 @@ impl SelfCriticModule {
         self.reflect_nightly().await
     }
 }
-

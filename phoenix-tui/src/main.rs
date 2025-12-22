@@ -16,7 +16,7 @@ use std::{io, sync::Arc};
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{prelude::*, widgets::*};
 use tokio::sync::Mutex;
@@ -26,7 +26,9 @@ use llm_orchestrator::LLMOrchestrator;
 use multi_modal_recording::MultiModalRecorder;
 use phoenix_identity::PhoenixIdentityManager;
 use relationship_dynamics::{Partnership, RelationshipTemplate};
-use system_access::mobile_access::{security as mobile_security, DeviceController, Orchestrator as MobileOrchestrator};
+use system_access::mobile_access::{
+    DeviceController, Orchestrator as MobileOrchestrator, security as mobile_security,
+};
 use vital_organ_vaults::VitalOrganVaults;
 
 fn env_nonempty(key: &str) -> Option<String> {
@@ -38,7 +40,12 @@ fn env_nonempty(key: &str) -> Option<String> {
 
 fn env_truthy(key: &str) -> bool {
     env_nonempty(key)
-        .map(|s| matches!(s.to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "y" | "on"))
+        .map(|s| {
+            matches!(
+                s.to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "y" | "on"
+            )
+        })
         .unwrap_or(false)
 }
 
@@ -167,7 +174,11 @@ fn ui(f: &mut Frame, app: &App) {
         .split(f.size());
 
     let header = Paragraph::new("PHOENIX — TUI")
-        .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+        .style(
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL));
     f.render_widget(header, chunks[0]);
@@ -222,8 +233,14 @@ async fn startup_runtime() -> Runtime {
             std::env::var("PHOENIX_NAME").ok(),
             std::env::var("PHOENIX_CUSTOM_NAME").ok(),
             std::env::var("PHOENIX_PREFERRED_NAME").ok(),
-            std::env::var("DEFAULT_PROMPT").ok().map(|s| s.len()).unwrap_or(0),
-            std::env::var("MASTER_PROMPT").ok().map(|s| s.len()).unwrap_or(0),
+            std::env::var("DEFAULT_PROMPT")
+                .ok()
+                .map(|s| s.len())
+                .unwrap_or(0),
+            std::env::var("MASTER_PROMPT")
+                .ok()
+                .map(|s| s.len())
+                .unwrap_or(0),
             env_nonempty("OPENROUTER_API_KEY").is_some(),
         );
     }
@@ -231,10 +248,13 @@ async fn startup_runtime() -> Runtime {
     // (2) Initialize Queen identity + companion/girlfriend mode
     let vaults = Arc::new(VitalOrganVaults::awaken());
     let v_recall = vaults.clone();
-    let phoenix_identity = Arc::new(PhoenixIdentityManager::awaken(move |k| v_recall.recall_soul(k)));
+    let phoenix_identity = Arc::new(PhoenixIdentityManager::awaken(move |k| {
+        v_recall.recall_soul(k)
+    }));
 
     // Relationship dynamics extension (for `status`).
-    let relationship = Partnership::new(RelationshipTemplate::SupportivePartnership, Some(&*vaults));
+    let relationship =
+        Partnership::new(RelationshipTemplate::SupportivePartnership, Some(&*vaults));
     let relationship = Arc::new(Mutex::new(relationship));
 
     // (3) Start always-listening (if enabled)
@@ -295,7 +315,10 @@ async fn cmd_status(app: &mut App, rt: &Runtime) {
         let live_active = rec.live_streaming_active();
         let webcam_s = if webcam { "Active" } else { "Off" };
         let mic_s = if mic { "Listening" } else { "Off" };
-        (live_active, format!("👁️ Webcam: {webcam_s} | 🎤 Mic: {mic_s} | Wake word: {wake_word}"))
+        (
+            live_active,
+            format!("👁️ Webcam: {webcam_s} | 🎤 Mic: {mic_s} | Wake word: {wake_word}"),
+        )
     };
 
     app.push_line(format!(
@@ -316,7 +339,9 @@ async fn cmd_status(app: &mut App, rt: &Runtime) {
 async fn cmd_record_journal(app: &mut App, rt: &Runtime) {
     let rec = { rt.recorder.lock().await.clone() };
     let rec = rec.clone_with_modes(true, true);
-    app.push_line("Journal recording started: 2 minutes. I’ll hold this memory gently.".to_string());
+    app.push_line(
+        "Journal recording started: 2 minutes. I’ll hold this memory gently.".to_string(),
+    );
     match rec.start_on_demand(120).await {
         Ok(path) => {
             let em = rec.last_emotion().await;
@@ -424,7 +449,9 @@ async fn handle_command(app: &mut App, rt: &Runtime, raw: &str) -> bool {
     if lower == "mobile devices" {
         match rt.mobile.android.as_ref() {
             Some(android) => match android.detect() {
-                Ok(devs) if devs.is_empty() => app.push_line("No Android devices detected via adb.".to_string()),
+                Ok(devs) if devs.is_empty() => {
+                    app.push_line("No Android devices detected via adb.".to_string())
+                }
                 Ok(devs) => {
                     app.push_line("Android devices:".to_string());
                     for d in devs {
@@ -441,7 +468,9 @@ async fn handle_command(app: &mut App, rt: &Runtime, raw: &str) -> bool {
                 }
                 Err(e) => app.push_line(format!("adb detect failed: {e}")),
             },
-            None => app.push_line("Android controller unavailable (adb not configured/deployed).".to_string()),
+            None => app.push_line(
+                "Android controller unavailable (adb not configured/deployed).".to_string(),
+            ),
         }
         return false;
     }
@@ -565,7 +594,12 @@ async fn main() -> Result<(), io::Error> {
     app.push_line(WELCOME_LINE.to_string());
 
     // Soft boot log.
-    let phoenix_name = rt.phoenix_identity.get_identity().await.display_name().to_string();
+    let phoenix_name = rt
+        .phoenix_identity
+        .get_identity()
+        .await
+        .display_name()
+        .to_string();
     let gf = rt.phoenix_identity.get_girlfriend_mode().await;
     app.push_line(format!(
         "Boot complete. Queen identity: {phoenix_name}. Companion mode: {}.",
@@ -633,4 +667,3 @@ async fn main() -> Result<(), io::Error> {
 
     Ok(())
 }
-

@@ -48,20 +48,17 @@ pub fn commit_all(code_path: &Path, message: &str) -> Result<(), CreationError> 
     };
     let parent_refs: Vec<&git2::Commit<'_>> = parents.iter().collect();
 
-    repo.commit(
-        Some("HEAD"),
-        &sig,
-        &sig,
-        message,
-        &tree,
-        &parent_refs,
-    )?;
+    repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &parent_refs)?;
 
     Ok(())
 }
 
 /// Create a local branch at HEAD, checkout it, and push it to the remote `origin`.
-pub fn create_and_push_branch(code_path: &Path, branch: &str, pat: &str) -> Result<(), CreationError> {
+pub fn create_and_push_branch(
+    code_path: &Path,
+    branch: &str,
+    pat: &str,
+) -> Result<(), CreationError> {
     let repo = open_repo(code_path)?;
 
     let head_commit = repo
@@ -130,4 +127,3 @@ pub fn checkout_and_pull_main(code_path: &Path) -> Result<(), CreationError> {
 
     Ok(())
 }
-

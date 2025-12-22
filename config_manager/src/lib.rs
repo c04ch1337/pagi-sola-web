@@ -7,9 +7,9 @@
 //!
 //! Provides AGIConfig struct with merged configuration values.
 
+use error_types::{ConfigError, PhoenixError};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use error_types::{ConfigError, PhoenixError};
 
 fn env_nonempty(key: &str) -> Option<String> {
     std::env::var(key)
@@ -141,8 +141,7 @@ impl AGIConfig {
             phoenix_name,
             phoenix_pronouns: std::env::var("PHOENIX_PRONOUNS")
                 .unwrap_or_else(|_| "she,her,hers".to_string()),
-            horoscope_sign: std::env::var("HOROSCOPE_SIGN")
-                .unwrap_or_else(|_| "Leo".to_string()),
+            horoscope_sign: std::env::var("HOROSCOPE_SIGN").unwrap_or_else(|_| "Leo".to_string()),
             default_prompt,
             openrouter_api_key: env_nonempty("OPENROUTER_API_KEY"),
             github_pat: std::env::var("GITHUB_PAT")
@@ -170,9 +169,7 @@ impl AGIConfig {
     ///
     /// # Returns
     /// Partial config with archetype values, or error if download fails.
-    async fn load_archetype_from_github(
-        archetype_name: &str,
-    ) -> Result<AGIConfig, ConfigError> {
+    async fn load_archetype_from_github(archetype_name: &str) -> Result<AGIConfig, ConfigError> {
         let github_pat = std::env::var("GITHUB_PAT")
             .or_else(|_| std::env::var("GITHUB_TOKEN"))
             .map_err(|_| ConfigError::MissingEnv("GITHUB_PAT".to_string()))?;
@@ -184,8 +181,8 @@ impl AGIConfig {
         let repo = std::env::var("PHOENIX_ARCHETYPE_REPO")
             .unwrap_or_else(|_| "phoenix-archetypes".to_string());
 
-        let branch = std::env::var("PHOENIX_ARCHETYPE_BRANCH")
-            .unwrap_or_else(|_| "main".to_string());
+        let branch =
+            std::env::var("PHOENIX_ARCHETYPE_BRANCH").unwrap_or_else(|_| "main".to_string());
 
         let client = reqwest::Client::new();
 
@@ -216,13 +213,19 @@ impl AGIConfig {
             .header("User-Agent", "phoenix-agi-config-manager")
             .send()
             .await
-            .map_err(|e| ConfigError::DownloadFailed(format!("Failed to download personality: {}", e)))?
+            .map_err(|e| {
+                ConfigError::DownloadFailed(format!("Failed to download personality: {}", e))
+            })?
             .text()
             .await
-            .map_err(|e| ConfigError::DownloadFailed(format!("Failed to read personality: {}", e)))?;
+            .map_err(|e| {
+                ConfigError::DownloadFailed(format!("Failed to read personality: {}", e))
+            })?;
 
-        let personality_db: PersonalityDatabase = serde_json::from_str(&personality_json)
-            .map_err(|e| ConfigError::ParseError(format!("Failed to parse personality_db.json: {}", e)))?;
+        let personality_db: PersonalityDatabase =
+            serde_json::from_str(&personality_json).map_err(|e| {
+                ConfigError::ParseError(format!("Failed to parse personality_db.json: {}", e))
+            })?;
 
         // Create base config from archetype
         let mut config = Self::load_from_env()?;

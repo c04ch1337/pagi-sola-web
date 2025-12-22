@@ -26,9 +26,7 @@ impl ReasoningMode {
     /// A small prompt-side nudge so downstream models behave consistently.
     pub fn prompt_hint(&self) -> &'static str {
         match self {
-            ReasoningMode::Reactive => {
-                "Mode=REACTIVE. Prioritize speed + clarity. Keep it short."
-            }
+            ReasoningMode::Reactive => "Mode=REACTIVE. Prioritize speed + clarity. Keep it short.",
             ReasoningMode::Deliberative => {
                 "Mode=DELIBERATIVE. Think step-by-step, then answer cleanly."
             }
@@ -71,7 +69,11 @@ pub fn detect_urgency(user_input: &str) -> f32 {
     let s = user_input.to_ascii_lowercase();
     // Heuristic: imperative urgency phrases + lots of exclamation + crisis keywords.
     let mut score: f32 = 0.0;
-    if s.contains("urgent") || s.contains("asap") || s.contains("right now") || s.contains("immediately") {
+    if s.contains("urgent")
+        || s.contains("asap")
+        || s.contains("right now")
+        || s.contains("immediately")
+    {
         score += 0.5;
     }
     if s.contains("help") || s.contains("panic") || s.contains("can't breathe") {
@@ -103,12 +105,21 @@ pub fn detect_dad_salience(
     let dad = dad_alias.to_ascii_lowercase();
 
     // Base salience: explicit Dad cues.
-    let mut score: f32 = if s.contains("dad") || s.contains(&dad) { 0.75 } else { 0.25 };
+    let mut score: f32 = if s.contains("dad") || s.contains(&dad) {
+        0.75
+    } else {
+        0.25
+    };
 
     // If user is vulnerable, increase salience: love-first is safer.
     if let Some(e) = inferred_emotion {
         let e = e.to_ascii_lowercase();
-        if e.contains("sad") || e.contains("lonely") || e.contains("hurt") || e.contains("anx") || e.contains("depress") {
+        if e.contains("sad")
+            || e.contains("lonely")
+            || e.contains("hurt")
+            || e.contains("anx")
+            || e.contains("depress")
+        {
             score += 0.25;
         }
         if e.contains("happy") || e.contains("grateful") {
@@ -120,4 +131,3 @@ pub fn detect_dad_salience(
     score = score.max(dad_love_level.clamp(0.0, 1.0));
     score.clamp(0.0, 1.0)
 }
-

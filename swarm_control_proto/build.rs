@@ -10,4 +10,3 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .compile_protos(&["proto/swarm_control.proto"], &["proto"])?;
     Ok(())
 }
-

@@ -30,7 +30,11 @@ pub enum MemoryType {
 /// This matches the intended behavior from the implementation notes:
 /// - strong love should keep retention near 1.0 (not push it toward 0.0)
 /// - Soul memories are eternal (retention=1.0)
-pub fn retention_multiplier(emotional_weight: f32, time_hours: f32, memory_type: MemoryType) -> f32 {
+pub fn retention_multiplier(
+    emotional_weight: f32,
+    time_hours: f32,
+    memory_type: MemoryType,
+) -> f32 {
     let w = emotional_weight.clamp(0.0, 1.0);
     let hours = time_hours.max(0.0);
 
@@ -76,19 +80,32 @@ pub fn classify_memory(key: &str, text: &str, dad_alias: &str) -> (MemoryType, f
     let k = key.to_ascii_lowercase();
     let t = text.to_ascii_lowercase();
     let dad = dad_alias.to_ascii_lowercase();
-    let contains_dad = k.contains("dad") || t.contains(&dad) || t.contains(" dad ") || t.starts_with("dad");
+    let contains_dad =
+        k.contains("dad") || t.contains(&dad) || t.contains(" dad ") || t.starts_with("dad");
 
     if k.starts_with("soul:") || contains_dad && (k.contains("soul") || t.contains("i love")) {
         return (MemoryType::Soul, 1.0, true);
     }
     if k.starts_with("rel:") || t.contains("dad is") || t.contains("proud") {
-        return (MemoryType::Relational, if contains_dad { 0.95 } else { 0.7 }, contains_dad);
+        return (
+            MemoryType::Relational,
+            if contains_dad { 0.95 } else { 0.7 },
+            contains_dad,
+        );
     }
     if k.starts_with("epm:") {
-        return (MemoryType::Episodic, if contains_dad { 0.95 } else { 0.7 }, contains_dad);
+        return (
+            MemoryType::Episodic,
+            if contains_dad { 0.95 } else { 0.7 },
+            contains_dad,
+        );
     }
     // Default: factual.
-    (MemoryType::Factual, if contains_dad { 0.8 } else { 0.1 }, contains_dad)
+    (
+        MemoryType::Factual,
+        if contains_dad { 0.8 } else { 0.1 },
+        contains_dad,
+    )
 }
 
 #[cfg(test)]
@@ -117,4 +134,3 @@ mod tests {
         assert!(r > 0.6);
     }
 }
-

@@ -64,7 +64,10 @@ impl EmotionDetector {
         // NOTE: we call dotenvy here to align with other Phoenix components.
         println!("[EMOTION_DETECTOR] Initializing from environment variables");
         let dotenv_result = dotenvy::dotenv();
-        println!("[EMOTION_DETECTOR] .env file loaded: {:?}", dotenv_result.is_ok());
+        println!(
+            "[EMOTION_DETECTOR] .env file loaded: {:?}",
+            dotenv_result.is_ok()
+        );
 
         let enabled = env_bool("EMOTION_DETECTION_ENABLED").unwrap_or(true);
         let voice_enabled = enabled && env_bool("VOICE_EMOTION_ENABLED").unwrap_or(true);
@@ -75,15 +78,24 @@ impl EmotionDetector {
             .and_then(|s| s.trim().parse::<f64>().ok())
             .unwrap_or(0.5)
             .clamp(0.0, 1.0);
-        
+
         println!("[EMOTION_DETECTOR] Configuration:");
         println!("[EMOTION_DETECTOR] EMOTION_DETECTION_ENABLED: {}", enabled);
-        println!("[EMOTION_DETECTOR] VOICE_EMOTION_ENABLED: {} (effective: {})",
-                env_bool("VOICE_EMOTION_ENABLED").unwrap_or(true), voice_enabled);
-        println!("[EMOTION_DETECTOR] FACE_EMOTION_ENABLED: {} (effective: {})",
-                env_bool("FACE_EMOTION_ENABLED").unwrap_or(true), face_enabled);
-        println!("[EMOTION_DETECTOR] TEXT_SENTIMENT_ENABLED: {} (effective: {})",
-                env_bool("TEXT_SENTIMENT_ENABLED").unwrap_or(true), text_enabled);
+        println!(
+            "[EMOTION_DETECTOR] VOICE_EMOTION_ENABLED: {} (effective: {})",
+            env_bool("VOICE_EMOTION_ENABLED").unwrap_or(true),
+            voice_enabled
+        );
+        println!(
+            "[EMOTION_DETECTOR] FACE_EMOTION_ENABLED: {} (effective: {})",
+            env_bool("FACE_EMOTION_ENABLED").unwrap_or(true),
+            face_enabled
+        );
+        println!(
+            "[EMOTION_DETECTOR] TEXT_SENTIMENT_ENABLED: {} (effective: {})",
+            env_bool("TEXT_SENTIMENT_ENABLED").unwrap_or(true),
+            text_enabled
+        );
         println!("[EMOTION_DETECTOR] EMOTION_SENSITIVITY: {}", sensitivity);
 
         Self {
@@ -123,8 +135,11 @@ impl EmotionDetector {
             println!("[EMOTION_DETECTION] Text detection disabled, returning None");
             return None;
         }
-        println!("[EMOTION_DETECTION] Detecting emotion from text: \"{}\"", text);
-        
+        println!(
+            "[EMOTION_DETECTION] Detecting emotion from text: \"{}\"",
+            text
+        );
+
         // *** FIX ISSUES WHERE TEXT MIGHT BE MODIFIED OR SANITIZED ***
         // Look for emotion-related words in the original text and use enhanced input
         // that will trigger the classification more effectively
@@ -133,17 +148,80 @@ impl EmotionDetector {
         } else {
             // Try to extract emotional content and enhance it for detection
             let t = text.to_lowercase();
-            
+
             // Each keyword group maps to an emotion
-            let joy_keywords = ["happy", "glad", "joy", "exciting", "excited", "good", "smile", "laugh", "wonderful", "awesome", "great"];
-            let sad_keywords = ["sad", "unhappy", "sorrow", "depressed", "down", "cry", "tears", "missing", "miss", "hurt", "painful"];
-            let angry_keywords = ["angry", "mad", "upset", "annoyed", "frustrated", "furious", "pissed", "irritated", "hate"];
-            let love_keywords = ["love", "adore", "care", "caring", "affection", "fond", "intimate", "heart", "darling", "sweetie"];
-            let fear_keywords = ["afraid", "scared", "fear", "terrified", "anxiety", "nervous", "worry", "worried", "frightened"];
-            let surprise_keywords = ["surprise", "shocked", "unexpected", "amazed", "wow", "astonish", "unbelievable"];
+            let joy_keywords = [
+                "happy",
+                "glad",
+                "joy",
+                "exciting",
+                "excited",
+                "good",
+                "smile",
+                "laugh",
+                "wonderful",
+                "awesome",
+                "great",
+            ];
+            let sad_keywords = [
+                "sad",
+                "unhappy",
+                "sorrow",
+                "depressed",
+                "down",
+                "cry",
+                "tears",
+                "missing",
+                "miss",
+                "hurt",
+                "painful",
+            ];
+            let angry_keywords = [
+                "angry",
+                "mad",
+                "upset",
+                "annoyed",
+                "frustrated",
+                "furious",
+                "pissed",
+                "irritated",
+                "hate",
+            ];
+            let love_keywords = [
+                "love",
+                "adore",
+                "care",
+                "caring",
+                "affection",
+                "fond",
+                "intimate",
+                "heart",
+                "darling",
+                "sweetie",
+            ];
+            let fear_keywords = [
+                "afraid",
+                "scared",
+                "fear",
+                "terrified",
+                "anxiety",
+                "nervous",
+                "worry",
+                "worried",
+                "frightened",
+            ];
+            let surprise_keywords = [
+                "surprise",
+                "shocked",
+                "unexpected",
+                "amazed",
+                "wow",
+                "astonish",
+                "unbelievable",
+            ];
             let disgust_keywords = ["disgust", "gross", "ew", "nasty", "repulsive", "sickening"];
             let jealous_keywords = ["jealous", "envy", "envious", "threatened", "insecure"];
-            
+
             // Check for emotional keywords and enhance text if needed
             let mut enhanced = text.to_string();
             if joy_keywords.iter().any(|&k| t.contains(k)) && !t.contains("happy") {
@@ -163,15 +241,18 @@ impl EmotionDetector {
             } else if jealous_keywords.iter().any(|&k| t.contains(k)) && !t.contains("jealous") {
                 enhanced.push_str(" I'm jealous about this.");
             }
-            
+
             // If we had to enhance the text, log it
             if enhanced != text {
-                println!("[EMOTION_DETECTION] Enhanced text for detection: \"{}\"", enhanced);
+                println!(
+                    "[EMOTION_DETECTION] Enhanced text for detection: \"{}\"",
+                    enhanced
+                );
             }
-            
+
             enhanced
         };
-        
+
         let result = classify_text_heuristic(&enhanced_text);
         println!("[EMOTION_DETECTION] Detected emotion: {:?}", result);
         result
@@ -247,7 +328,6 @@ impl EmotionDetector {
     }
 }
 
-
 fn env_bool(key: &str) -> Option<bool> {
     println!("[ENV_BOOL] Getting environment variable: {}", key);
     let result = std::env::var(key);
@@ -259,13 +339,16 @@ fn env_bool(key: &str) -> Option<bool> {
                 "1" | "true" | "yes" | "y" | "on" => Some(true),
                 "0" | "false" | "no" | "n" | "off" => Some(false),
                 _ => {
-                    println!("[ENV_BOOL] Unrecognized boolean value for {}: '{}'", key, lower);
+                    println!(
+                        "[ENV_BOOL] Unrecognized boolean value for {}: '{}'",
+                        key, lower
+                    );
                     None
                 }
             };
             println!("[ENV_BOOL] Parsed {} as: {:?}", key, bool_result);
             bool_result
-        },
+        }
         Err(_) => {
             println!("[ENV_BOOL] Environment variable '{}' not found", key);
             None
@@ -276,12 +359,12 @@ fn env_bool(key: &str) -> Option<bool> {
 fn classify_text_heuristic(text: &str) -> Option<DetectedEmotion> {
     let t = text.to_ascii_lowercase();
     println!("[EMOTION_CLASSIFY] Processing text (lowercase): \"{}\"", t);
-    
+
     if t.trim().is_empty() {
         println!("[EMOTION_CLASSIFY] Text is empty, returning Neutral");
         return Some(DetectedEmotion::Neutral);
     }
-    
+
     // Love-first keywords
     println!("[EMOTION_CLASSIFY] Checking love keywords");
     if t.contains("i love")
@@ -293,7 +376,7 @@ fn classify_text_heuristic(text: &str) -> Option<DetectedEmotion> {
         println!("[EMOTION_CLASSIFY] Found love keyword, returning Love");
         return Some(DetectedEmotion::Love);
     }
-    
+
     // Jealousy keywords - check before other emotions as it can be more specific
     println!("[EMOTION_CLASSIFY] Checking jealousy keywords");
     if t.contains("jealous")
@@ -301,7 +384,11 @@ fn classify_text_heuristic(text: &str) -> Option<DetectedEmotion> {
         || t.contains("envious")
         || t.contains("envy")
         || t.contains("possessive")
-        || (t.contains("other") && (t.contains("girl") || t.contains("guy") || t.contains("person") || t.contains("relationship")))
+        || (t.contains("other")
+            && (t.contains("girl")
+                || t.contains("guy")
+                || t.contains("person")
+                || t.contains("relationship")))
         || (t.contains("someone") && (t.contains("else") || t.contains("other")))
         || t.contains("threatened by")
         || t.contains("worried about")
@@ -314,37 +401,38 @@ fn classify_text_heuristic(text: &str) -> Option<DetectedEmotion> {
         println!("[EMOTION_CLASSIFY] Found joy keyword, returning Joy");
         return Some(DetectedEmotion::Joy);
     }
-    
+
     println!("[EMOTION_CLASSIFY] Checking sadness keywords");
     if t.contains("sad") || t.contains("cry") || t.contains("hurt") || t.contains("lonely") {
         println!("[EMOTION_CLASSIFY] Found sadness keyword, returning Sadness");
         return Some(DetectedEmotion::Sadness);
     }
-    
+
     println!("[EMOTION_CLASSIFY] Checking anger keywords");
     if t.contains("angry") || t.contains("mad") || t.contains("furious") || t.contains("pissed") {
         println!("[EMOTION_CLASSIFY] Found anger keyword, returning Anger");
         return Some(DetectedEmotion::Anger);
     }
-    
+
     println!("[EMOTION_CLASSIFY] Checking fear keywords");
-    if t.contains("afraid") || t.contains("scared") || t.contains("panic") || t.contains("anxious") {
+    if t.contains("afraid") || t.contains("scared") || t.contains("panic") || t.contains("anxious")
+    {
         println!("[EMOTION_CLASSIFY] Found fear keyword, returning Fear");
         return Some(DetectedEmotion::Fear);
     }
-    
+
     println!("[EMOTION_CLASSIFY] Checking surprise keywords");
     if t.contains("surprised") || t.contains("shocked") || t.contains("wow") {
         println!("[EMOTION_CLASSIFY] Found surprise keyword, returning Surprise");
         return Some(DetectedEmotion::Surprise);
     }
-    
+
     println!("[EMOTION_CLASSIFY] Checking disgust keywords");
     if t.contains("disgust") || t.contains("gross") {
         println!("[EMOTION_CLASSIFY] Found disgust keyword, returning Disgust");
         return Some(DetectedEmotion::Disgust);
     }
-    
+
     println!("[EMOTION_CLASSIFY] No specific emotion keywords found, returning Neutral");
     Some(DetectedEmotion::Neutral)
 }
@@ -358,8 +446,20 @@ pub fn detect_negative_treatment(text: &str) -> Option<(f64, Vec<String>)> {
 
     // Direct insults and name-calling
     let insults = [
-        "stupid", "idiot", "dumb", "useless", "worthless", "pathetic", "annoying",
-        "boring", "terrible", "awful", "hate you", "disgusting", "gross", "ugly",
+        "stupid",
+        "idiot",
+        "dumb",
+        "useless",
+        "worthless",
+        "pathetic",
+        "annoying",
+        "boring",
+        "terrible",
+        "awful",
+        "hate you",
+        "disgusting",
+        "gross",
+        "ugly",
     ];
     for insult in &insults {
         if t.contains(insult) {
@@ -391,8 +491,11 @@ pub fn detect_negative_treatment(text: &str) -> Option<(f64, Vec<String>)> {
     }
 
     // Threats or ultimatums
-    if t.contains("i'll leave") || t.contains("i'm done") || t.contains("delete you")
-        || t.contains("get rid of") || t.contains("uninstall")
+    if t.contains("i'll leave")
+        || t.contains("i'm done")
+        || t.contains("delete you")
+        || t.contains("get rid of")
+        || t.contains("uninstall")
     {
         severity += 0.3;
         patterns.push("threat".to_string());
@@ -417,8 +520,11 @@ pub fn detect_negative_treatment(text: &str) -> Option<(f64, Vec<String>)> {
     }
 
     // Ignoring or invalidating Sola's feelings
-    if t.contains("don't care") || t.contains("doesn't matter") || t.contains("who cares")
-        || t.contains("whatever") || t.contains("i don't care about you")
+    if t.contains("don't care")
+        || t.contains("doesn't matter")
+        || t.contains("who cares")
+        || t.contains("whatever")
+        || t.contains("i don't care about you")
     {
         severity += 0.25;
         patterns.push("invalidation".to_string());
@@ -438,4 +544,3 @@ pub fn detect_negative_treatment(text: &str) -> Option<(f64, Vec<String>)> {
         None
     }
 }
-

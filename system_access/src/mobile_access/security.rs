@@ -76,4 +76,3 @@ fn append_audit_line(action: &str, result: &Result<(), MobileError>) -> Result<(
     f.write_all(b"\n")?;
     Ok(())
 }
-

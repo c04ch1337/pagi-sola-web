@@ -67,8 +67,7 @@ pub struct EcosystemManager {
 impl EcosystemManager {
     pub fn new(base_path: impl AsRef<Path>) -> Result<Self> {
         let base = base_path.as_ref().to_path_buf();
-        std::fs::create_dir_all(&base)
-            .context("Failed to create ecosystem base directory")?;
+        std::fs::create_dir_all(&base).context("Failed to create ecosystem base directory")?;
 
         Ok(Self {
             repos: Arc::new(Mutex::new(HashMap::new())),
@@ -281,8 +280,7 @@ impl EcosystemManager {
                 let mut cmd = tokio::process::Command::new("cargo");
                 cmd.args(["run", "--release"]);
                 cmd.current_dir(&path);
-                cmd.spawn()
-                    .context("Failed to start cargo run")?
+                cmd.spawn().context("Failed to start cargo run")?
             }
             BuildSystem::Npm => {
                 let cmd_name = command.unwrap_or("start");
@@ -290,8 +288,7 @@ impl EcosystemManager {
                 cmd.arg("run");
                 cmd.arg(cmd_name);
                 cmd.current_dir(&path);
-                cmd.spawn()
-                    .context("Failed to start npm run")?
+                cmd.spawn().context("Failed to start npm run")?
             }
             BuildSystem::Pip => {
                 // Try to find main.py or __main__.py
@@ -305,8 +302,7 @@ impl EcosystemManager {
                 let mut cmd = tokio::process::Command::new("python");
                 cmd.arg(main_file);
                 cmd.current_dir(&path);
-                cmd.spawn()
-                    .context("Failed to start python service")?
+                cmd.spawn().context("Failed to start python service")?
             }
             _ => return Err(anyhow::anyhow!("Unsupported build system for service")),
         };
@@ -393,7 +389,11 @@ impl EcosystemManager {
                 cmd.current_dir(&path);
                 cmd.output()?
             }
-            _ => return Err(anyhow::anyhow!("Command execution not supported for this build system")),
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Command execution not supported for this build system"
+                ))
+            }
         };
 
         if !output.status.success() {

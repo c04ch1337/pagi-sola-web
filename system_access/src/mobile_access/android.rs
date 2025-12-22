@@ -73,7 +73,11 @@ impl AndroidController {
         Ok(devices)
     }
 
-    pub fn connect_device(&mut self, device_id: &str, mode: ConnectionMode) -> Result<(), MobileError> {
+    pub fn connect_device(
+        &mut self,
+        device_id: &str,
+        mode: ConnectionMode,
+    ) -> Result<(), MobileError> {
         match mode {
             ConnectionMode::Usb => {
                 // No-op beyond selecting the device; actual authorization is reflected in `adb devices`.
@@ -225,7 +229,11 @@ impl AndroidController {
     }
 
     /// Dumps a UI hierarchy XML using uiautomator2 (best-effort).
-    pub fn uiautomator2_dump_hierarchy(&self, python: Option<&Path>, out_path: &Path) -> Result<(), MobileError> {
+    pub fn uiautomator2_dump_hierarchy(
+        &self,
+        python: Option<&Path>,
+        out_path: &Path,
+    ) -> Result<(), MobileError> {
         let Some(id) = self.current_device_id.as_deref() else {
             return Err(MobileError::Config(
                 "No Android device selected. Call connect() first".to_string(),
@@ -255,4 +263,3 @@ impl AndroidController {
         Ok(())
     }
 }
-

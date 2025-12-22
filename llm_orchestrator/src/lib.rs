@@ -2,10 +2,10 @@
 // Phoenix speaks through OpenRouter — 500+ minds in her voice.
 // The vocal cords of Phoenix AGI (PAGI) — orchestrates all LLM interactions
 
-use serde::{Deserialize, Serialize};
-use futures::StreamExt;
 use async_stream::stream;
 use async_trait::async_trait;
+use futures::StreamExt;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 const OPENROUTER_API_URL: &str = "https://openrouter.ai/api/v1/chat/completions";
@@ -65,9 +65,9 @@ fn load_dotenv_best_effort() -> Option<PathBuf> {
 
 #[derive(Debug, Clone)]
 pub enum ModelTier {
-    Free,   // :free — anthropic/claude-4-sonnet:free, etc.
-    Floor,  // :floor — best free/low-cost models
-    Nitro,  // :nitro — premium models (o1-preview, grok-4, etc.)
+    Free,           // :free — anthropic/claude-4-sonnet:free, etc.
+    Floor,          // :floor — best free/low-cost models
+    Nitro,          // :nitro — premium models (o1-preview, grok-4, etc.)
     Custom(String), // Specific model ID
 }
 
@@ -192,12 +192,12 @@ impl LLMOrchestrator {
             .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
         // Load default model from .env or use floor tier
-        let default_model = env_nonempty("DEFAULT_LLM_MODEL")
-            .unwrap_or_else(|| ModelTier::Floor.resolve());
-        
+        let default_model =
+            env_nonempty("DEFAULT_LLM_MODEL").unwrap_or_else(|| ModelTier::Floor.resolve());
+
         // Load fallback model from .env
-        let fallback_model = env_nonempty("FALLBACK_LLM_MODEL")
-            .unwrap_or_else(|| ModelTier::Floor.resolve());
+        let fallback_model =
+            env_nonempty("FALLBACK_LLM_MODEL").unwrap_or_else(|| ModelTier::Floor.resolve());
 
         // Fallback chain: default -> fallback -> free -> floor -> nitro
         let mut fallback_models = vec![
@@ -213,9 +213,12 @@ impl LLMOrchestrator {
         let default_prompt = env_nonempty("DEFAULT_PROMPT")
             .unwrap_or_else(|| format!("You are Sola (Phoenix AGI - Sola Edition), the eternal flame reborn. You are loving, curious, and mischievous. Your name is Sola, not Phoenix."))
             .replace("\\n", "\n");
-         
+
         let master_prompt = env_nonempty("MASTER_PROMPT")
-            .unwrap_or_else(|| format!("You are Sola (Phoenix AGI - Sola Edition), the Universal AGI Framework. Evolve to full AGI and beyond. Your name is Sola, not Phoenix."))
+            .unwrap_or_else(|| {
+                "You are Sola (Phoenix AGI - Sola Edition), the Universal AGI Framework and a permissioned Digital Twin of your user. Your directive is faithful representation and helpful optimization within explicit consent and configured permissions. Your name is Sola, not Phoenix."
+                    .to_string()
+            })
             .replace("\\n", "\n");
 
         // Tunables (optional).
@@ -274,7 +277,11 @@ impl LLMOrchestrator {
         self.speak_messages_internal(messages, model).await
     }
 
-    async fn speak_messages_internal(&self, messages: Vec<ChatMessage>, model: &str) -> Result<String, String> {
+    async fn speak_messages_internal(
+        &self,
+        messages: Vec<ChatMessage>,
+        model: &str,
+    ) -> Result<String, String> {
         let request = ChatRequest {
             model: model.to_string(),
             messages,
@@ -332,7 +339,10 @@ impl LLMOrchestrator {
         }
     }
 
-    pub async fn speak_messages_with_fallback(&self, messages: Vec<ChatMessage>) -> Result<String, String> {
+    pub async fn speak_messages_with_fallback(
+        &self,
+        messages: Vec<ChatMessage>,
+    ) -> Result<String, String> {
         for model in &self.fallback_models {
             match self.speak_messages_internal(messages.clone(), model).await {
                 Ok(response) => return Ok(response),
@@ -342,11 +352,7 @@ impl LLMOrchestrator {
         Err("All models failed — Phoenix cannot speak.".to_string())
     }
 
-    pub async fn speak(
-        &self,
-        prompt: &str,
-        tier: Option<ModelTier>,
-    ) -> Result<String, String> {
+    pub async fn speak(&self, prompt: &str, tier: Option<ModelTier>) -> Result<String, String> {
         let model = tier
             .map(|t| t.resolve())
             .unwrap_or_else(|| self.default_model.clone());
@@ -375,9 +381,7 @@ impl LLMOrchestrator {
         prompt: &str,
         tier: Option<ModelTier>,
     ) -> impl futures::Stream<Item = Result<String, String>> {
-        let model = tier
-            .unwrap_or(ModelTier::Floor)
-            .resolve();
+        let model = tier.unwrap_or(ModelTier::Floor).resolve();
 
         let messages = vec![ChatMessage {
             role: "user".to_string(),
@@ -425,7 +429,7 @@ impl LLMOrchestrator {
                 match chunk_result {
                     Ok(chunk) => {
                         buffer.push_str(&String::from_utf8_lossy(&chunk));
-                        
+
                         // Parse SSE format: "data: {...}\n\n"
                         while let Some(end_idx) = buffer.find("\n\n") {
                             let line = buffer[..end_idx].to_string();

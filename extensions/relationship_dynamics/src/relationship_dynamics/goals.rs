@@ -31,7 +31,11 @@ impl SharedGoal {
         let w = width.max(4);
         let filled = ((self.progress.clamp(0.0, 1.0) * w as f64).round() as usize).min(w);
         let empty = w - filled;
-        format!("[{}{}] {:>3}%", "█".repeat(filled), "░".repeat(empty), (self.progress * 100.0).round() as i32)
+        format!(
+            "[{}{}] {:>3}%",
+            "█".repeat(filled),
+            "░".repeat(empty),
+            (self.progress * 100.0).round() as i32
+        )
     }
 }
-

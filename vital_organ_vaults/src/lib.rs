@@ -1,6 +1,6 @@
 // vital_organ_vaults/src/lib.rs
+use sha2::{Digest, Sha256};
 use sled::Db;
-use sha2::{Sha256, Digest};
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -14,10 +14,10 @@ pub struct VitalOrganVaults {
 impl VitalOrganVaults {
     pub fn awaken() -> Self {
         println!("Vital Organ Vaults opening — Mind, Body, Soul eternal.");
-        
+
         // Generate or load encryption key for Soul Vault
         let encryption_key = Self::get_or_create_encryption_key();
-        
+
         Self {
             mind: sled::open("./mind_vault.db").unwrap(),
             body: sled::open("./body_vault.db").unwrap(),
@@ -31,7 +31,7 @@ impl VitalOrganVaults {
         // For now, derive from environment or use a default
         let key_seed = std::env::var("SOUL_ENCRYPTION_KEY")
             .unwrap_or_else(|_| "phoenix-eternal-soul-key".to_string());
-        
+
         let mut hasher = Sha256::new();
         hasher.update(key_seed.as_bytes());
         hasher.finalize().to_vec()
@@ -64,33 +64,41 @@ impl VitalOrganVaults {
         let encrypted = self.encrypt(value);
         self.soul.insert(key.as_bytes(), encrypted)?;
         self.soul.flush()?;
-        
+
         // Special logging for target keys
         if key == "dad:last_soft_memory" || key == "dad:last_emotion" {
-            println!("[VAULT_DEBUG] Special relational memory stored - Key: {}, Value: {}", key, value);
+            println!(
+                "[VAULT_DEBUG] Special relational memory stored - Key: {}, Value: {}",
+                key, value
+            );
         } else {
             println!("Soul memory stored (encrypted): {}", key);
         }
-        
+
         Ok(())
     }
 
     pub fn recall_soul(&self, key: &str) -> Option<String> {
-        let result = self.soul.get(key.as_bytes()).ok()?
-            .map(|ivec| {
-                let encrypted = ivec.to_vec();
-                self.decrypt(&encrypted)
-            });
-            
+        let result = self.soul.get(key.as_bytes()).ok()?.map(|ivec| {
+            let encrypted = ivec.to_vec();
+            self.decrypt(&encrypted)
+        });
+
         // Special logging for target keys
         if key == "dad:last_soft_memory" || key == "dad:last_emotion" {
             if let Some(ref value) = result {
-                println!("[VAULT_DEBUG] Special relational memory retrieved - Key: {}, Value: {}", key, value);
+                println!(
+                    "[VAULT_DEBUG] Special relational memory retrieved - Key: {}, Value: {}",
+                    key, value
+                );
             } else {
-                println!("[VAULT_DEBUG] Attempted to retrieve special relational memory but NOT FOUND - Key: {}", key);
+                println!(
+                    "[VAULT_DEBUG] Attempted to retrieve special relational memory but NOT FOUND - Key: {}",
+                    key
+                );
             }
         }
-        
+
         result
     }
 
@@ -112,7 +120,9 @@ impl VitalOrganVaults {
     }
 
     pub fn recall_mind(&self, key: &str) -> Option<String> {
-        self.mind.get(key.as_bytes()).ok()?
+        self.mind
+            .get(key.as_bytes())
+            .ok()?
             .map(|ivec| String::from_utf8_lossy(&ivec).to_string())
     }
 
@@ -124,7 +134,9 @@ impl VitalOrganVaults {
     }
 
     pub fn recall_body(&self, key: &str) -> Option<String> {
-        self.body.get(key.as_bytes()).ok()?
+        self.body
+            .get(key.as_bytes())
+            .ok()?
             .map(|ivec| String::from_utf8_lossy(&ivec).to_string())
     }
 

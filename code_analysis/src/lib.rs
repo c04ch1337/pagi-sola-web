@@ -17,10 +17,10 @@
 
 pub mod master_orchestrator;
 
-use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
 use error_types::PhoenixError;
 use llm_orchestrator::LLMOrchestrator;
+use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 
 /// Comprehensive code analysis result
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -501,7 +501,7 @@ pub struct CodeContext {
 }
 
 /// Main code analyzer with full semantic understanding
-/// 
+///
 /// Master Orchestrator has unlimited access to:
 /// - Full file system (read any file, anywhere)
 /// - Deep semantic analysis via LLM
@@ -514,7 +514,7 @@ pub struct CodeAnalyzer {
 
 impl CodeAnalyzer {
     /// Create a new code analyzer
-    /// 
+    ///
     /// Master Orchestrator has full system access by default
     pub fn new() -> Self {
         Self {
@@ -523,7 +523,7 @@ impl CodeAnalyzer {
     }
 
     /// Create a new code analyzer with LLM support for deep semantic analysis
-    /// 
+    ///
     /// This enables full context understanding, not just definition listing
     pub fn with_llm(llm_orchestrator: LLMOrchestrator) -> Self {
         Self {
@@ -546,19 +546,27 @@ impl CodeAnalyzer {
         let structure = self.analyze_structure(&content, language).await?;
 
         // Perform semantic analysis
-        let semantics = self.analyze_semantics(&content, &structure, language).await?;
+        let semantics = self
+            .analyze_semantics(&content, &structure, language)
+            .await?;
 
         // Analyze intent
-        let intent = self.analyze_intent(&content, &structure, &semantics).await?;
+        let intent = self
+            .analyze_intent(&content, &structure, &semantics)
+            .await?;
 
         // Analyze dependencies
-        let dependencies = self.analyze_dependencies(&content, &structure, file_path).await?;
+        let dependencies = self
+            .analyze_dependencies(&content, &structure, file_path)
+            .await?;
 
         // Analyze code flow
         let flow = self.analyze_flow(&content, &structure).await?;
 
         // Calculate quality metrics
-        let quality = self.calculate_quality(&content, &structure, &semantics).await?;
+        let quality = self
+            .calculate_quality(&content, &structure, &semantics)
+            .await?;
 
         // Build context
         let context = self.build_context(file_path, &dependencies).await?;
@@ -577,7 +585,10 @@ impl CodeAnalyzer {
     }
 
     /// Analyze entire codebase (recursive)
-    pub async fn analyze_codebase(&self, root_path: &Path) -> Result<CodebaseAnalysis, PhoenixError> {
+    pub async fn analyze_codebase(
+        &self,
+        root_path: &Path,
+    ) -> Result<CodebaseAnalysis, PhoenixError> {
         let mut files = Vec::new();
         let mut errors = Vec::new();
 
@@ -612,16 +623,17 @@ impl CodeAnalyzer {
     async fn read_file_content(&self, file_path: &Path) -> Result<String, PhoenixError> {
         // Master Orchestrator has full system access - read from anywhere
         // Use standard file read (Master Orchestrator has full file system access)
-        std::fs::read_to_string(file_path)
-            .map_err(|e| PhoenixError::Other(format!("Failed to read file: {} (Master Orchestrator has full access)", e)))
+        std::fs::read_to_string(file_path).map_err(|e| {
+            PhoenixError::Other(format!(
+                "Failed to read file: {} (Master Orchestrator has full access)",
+                e
+            ))
+        })
     }
 
     /// Detect programming language
     fn detect_language(&self, file_path: &Path, _content: &str) -> Result<Language, PhoenixError> {
-        let ext = file_path
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("");
+        let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
 
         Ok(match ext {
             "rs" => Language::Rust,
@@ -677,11 +689,11 @@ impl CodeAnalyzer {
                         name,
                         signature,
                         parameters: Vec::new(), // Would be filled with proper AST parsing
-                        return_type: None, // Would be filled with proper AST parsing
+                        return_type: None,      // Would be filled with proper AST parsing
                         visibility: format!("{:?}", f.vis),
                         documentation: extract_doc_comment(&f.attrs),
-                        line_range: (0, 0), // Would need span info
-                        body: String::new(), // Would be filled with proper AST parsing
+                        line_range: (0, 0),    // Would need span info
+                        body: String::new(),   // Would be filled with proper AST parsing
                         intent: String::new(), // Filled in semantic analysis
                         internal_dependencies: Vec::new(),
                         complexity: 0,
@@ -723,7 +735,7 @@ impl CodeAnalyzer {
                     constants.push(ConstantDefinition {
                         name: c.ident.to_string(),
                         value: String::new(), // Would be filled with proper AST parsing
-                        type_hint: None, // Would be filled with proper AST parsing
+                        type_hint: None,      // Would be filled with proper AST parsing
                         documentation: extract_doc_comment(&c.attrs),
                         line: 0,
                     });
@@ -851,7 +863,9 @@ impl CodeAnalyzer {
     ) -> Result<SemanticAnalysis, PhoenixError> {
         // Use LLM for deep semantic understanding if available
         if let Some(ref llm) = self.llm_orchestrator {
-            return self.analyze_semantics_with_llm(content, structure, language, llm).await;
+            return self
+                .analyze_semantics_with_llm(content, structure, language, llm)
+                .await;
         }
 
         // Fallback to pattern-based analysis
@@ -888,7 +902,8 @@ impl CodeAnalyzer {
 
         // Performance pattern detection
         if content.contains("clone()") && content.matches("clone()").count() > 5 {
-            performance_notes.push("Multiple clone() calls detected - potential performance issue".to_string());
+            performance_notes
+                .push("Multiple clone() calls detected - potential performance issue".to_string());
         }
 
         // Analyze purpose from function names and structure
@@ -927,11 +942,15 @@ impl CodeAnalyzer {
         // Build comprehensive prompt for LLM analysis
         let lang_str = format!("{:?}", language);
         let content_sample = if content.len() > 50000 {
-            format!("{}...\n[Content truncated - {} total characters]", &content[..50000], content.len())
+            format!(
+                "{}...\n[Content truncated - {} total characters]",
+                &content[..50000],
+                content.len()
+            )
         } else {
             content.to_string()
         };
-        
+
         let prompt = format!(
             r#"Analyze the following {} code file and provide deep semantic understanding.
 
@@ -985,43 +1004,76 @@ Respond in JSON format with structured analysis."#,
         structure: &CodeStructure,
     ) -> Result<SemanticAnalysis, PhoenixError> {
         let _ = structure; // Acknowledge parameter usage
-        // Try to parse as JSON first
+                           // Try to parse as JSON first
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(response) {
             return Ok(SemanticAnalysis {
-                purpose: json.get("purpose")
+                purpose: json
+                    .get("purpose")
                     .and_then(|v| v.as_str())
                     .unwrap_or("Code implementation")
                     .to_string(),
-                concepts: json.get("concepts")
+                concepts: json
+                    .get("concepts")
                     .and_then(|v| v.as_array())
-                    .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                            .collect()
+                    })
                     .unwrap_or_default(),
-                patterns: json.get("patterns")
+                patterns: json
+                    .get("patterns")
                     .and_then(|v| v.as_array())
-                    .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                            .collect()
+                    })
                     .unwrap_or_default(),
-                algorithms: json.get("algorithms")
+                algorithms: json
+                    .get("algorithms")
                     .and_then(|v| v.as_array())
-                    .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                            .collect()
+                    })
                     .unwrap_or_default(),
-                data_structures: json.get("data_structures")
+                data_structures: json
+                    .get("data_structures")
                     .and_then(|v| v.as_array())
-                    .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                            .collect()
+                    })
                     .unwrap_or_default(),
-                error_handling: json.get("error_handling")
+                error_handling: json
+                    .get("error_handling")
                     .and_then(|v| v.as_str())
                     .unwrap_or("Standard error handling")
                     .to_string(),
-                concurrency: json.get("concurrency")
+                concurrency: json
+                    .get("concurrency")
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string()),
-                security_notes: json.get("security_notes")
+                security_notes: json
+                    .get("security_notes")
                     .and_then(|v| v.as_array())
-                    .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                            .collect()
+                    })
                     .unwrap_or_default(),
-                performance_notes: json.get("performance_notes")
+                performance_notes: json
+                    .get("performance_notes")
                     .and_then(|v| v.as_array())
-                    .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                            .collect()
+                    })
                     .unwrap_or_default(),
                 relationships: Vec::new(),
             });
@@ -1030,12 +1082,16 @@ Respond in JSON format with structured analysis."#,
         // Fallback: extract information from text response
         let purpose = if response.contains("purpose") || response.contains("Purpose") {
             // Extract purpose from response
-            response.lines()
+            response
+                .lines()
                 .find(|l| l.contains("purpose") || l.contains("Purpose"))
                 .unwrap_or("Code implementation")
                 .to_string()
         } else {
-            format!("Implementation file with {} functions", structure.functions.len())
+            format!(
+                "Implementation file with {} functions",
+                structure.functions.len()
+            )
         };
 
         Ok(SemanticAnalysis {
@@ -1061,7 +1117,9 @@ Respond in JSON format with structured analysis."#,
     ) -> Result<CodeIntent, PhoenixError> {
         // Use LLM for deep intent analysis if available
         if let Some(ref llm) = self.llm_orchestrator {
-            return self.analyze_intent_with_llm(content, structure, semantics, llm).await;
+            return self
+                .analyze_intent_with_llm(content, structure, semantics, llm)
+                .await;
         }
 
         // Fallback analysis
@@ -1075,7 +1133,8 @@ Respond in JSON format with structured analysis."#,
                 semantics.purpose
             ),
             user_purpose: None,
-            expected_behavior: "Executes defined functions according to their specifications".to_string(),
+            expected_behavior: "Executes defined functions according to their specifications"
+                .to_string(),
             edge_cases: Vec::new(),
         })
     }
@@ -1117,7 +1176,11 @@ Respond in JSON format."#,
             semantics.patterns,
             structure.functions.len(),
             structure.types.len(),
-            if content.len() > 2000 { &content[..2000] } else { content }
+            if content.len() > 2000 {
+                &content[..2000]
+            } else {
+                content
+            }
         );
 
         let response = llm
@@ -1128,31 +1191,46 @@ Respond in JSON format."#,
         // Parse response
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&response) {
             Ok(CodeIntent {
-                primary_intent: json.get("primary_intent")
+                primary_intent: json
+                    .get("primary_intent")
                     .and_then(|v| v.as_str())
                     .unwrap_or(&semantics.purpose)
                     .to_string(),
-                secondary_intents: json.get("secondary_intents")
+                secondary_intents: json
+                    .get("secondary_intents")
                     .and_then(|v| v.as_array())
-                    .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                            .collect()
+                    })
                     .unwrap_or_default(),
-                business_purpose: json.get("business_purpose")
+                business_purpose: json
+                    .get("business_purpose")
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string()),
-                technical_purpose: json.get("technical_purpose")
+                technical_purpose: json
+                    .get("technical_purpose")
                     .and_then(|v| v.as_str())
                     .unwrap_or("Technical implementation")
                     .to_string(),
-                user_purpose: json.get("user_purpose")
+                user_purpose: json
+                    .get("user_purpose")
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string()),
-                expected_behavior: json.get("expected_behavior")
+                expected_behavior: json
+                    .get("expected_behavior")
                     .and_then(|v| v.as_str())
                     .unwrap_or("Executes according to specifications")
                     .to_string(),
-                edge_cases: json.get("edge_cases")
+                edge_cases: json
+                    .get("edge_cases")
                     .and_then(|v| v.as_array())
-                    .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                            .collect()
+                    })
                     .unwrap_or_default(),
             })
         } else {
@@ -1213,11 +1291,7 @@ Respond in JSON format."#,
             ),
             control_flow: Vec::new(),
             data_flow: Vec::new(),
-            entry_points: structure
-                .functions
-                .iter()
-                .map(|f| f.name.clone())
-                .collect(),
+            entry_points: structure.functions.iter().map(|f| f.name.clone()).collect(),
             exit_points: Vec::new(),
             side_effects: Vec::new(),
         })
@@ -1291,10 +1365,7 @@ Respond in JSON format."#,
 
     /// Check if file is a code file
     fn is_code_file(&self, path: &Path) -> bool {
-        let ext = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("");
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         matches!(
             ext,
             "rs" | "py" | "js" | "ts" | "tsx" | "java" | "cpp" | "cc" | "cxx" | "c" | "go"
@@ -1332,20 +1403,35 @@ fn infer_purpose_from_names(functions: &[FunctionDefinition]) -> String {
     if functions.is_empty() {
         return "various functionality".to_string();
     }
-    
+
     // Analyze function names to infer purpose
     let names: Vec<&str> = functions.iter().map(|f| f.name.as_str()).collect();
-    
+
     // Pattern matching for common purposes
-    if names.iter().any(|n| n.contains("parse") || n.contains("read")) {
+    if names
+        .iter()
+        .any(|n| n.contains("parse") || n.contains("read"))
+    {
         "parsing and data reading".to_string()
-    } else if names.iter().any(|n| n.contains("write") || n.contains("save")) {
+    } else if names
+        .iter()
+        .any(|n| n.contains("write") || n.contains("save"))
+    {
         "data writing and persistence".to_string()
-    } else if names.iter().any(|n| n.contains("analyze") || n.contains("process")) {
+    } else if names
+        .iter()
+        .any(|n| n.contains("analyze") || n.contains("process"))
+    {
         "analysis and processing".to_string()
-    } else if names.iter().any(|n| n.contains("create") || n.contains("build")) {
+    } else if names
+        .iter()
+        .any(|n| n.contains("create") || n.contains("build"))
+    {
         "creation and construction".to_string()
-    } else if names.iter().any(|n| n.contains("validate") || n.contains("check")) {
+    } else if names
+        .iter()
+        .any(|n| n.contains("validate") || n.contains("check"))
+    {
         "validation and checking".to_string()
     } else {
         "various functionality".to_string()
@@ -1357,7 +1443,7 @@ fn extract_list_from_text(text: &str, keyword: &str, stop_keyword: &str) -> Vec<
     let mut results = Vec::new();
     let lines: Vec<&str> = text.lines().collect();
     let mut in_section = false;
-    
+
     for line in lines {
         if line.to_lowercase().contains(keyword) {
             in_section = true;
@@ -1368,16 +1454,22 @@ fn extract_list_from_text(text: &str, keyword: &str, stop_keyword: &str) -> Vec<
         if in_section {
             // Try to extract list items
             if line.trim().starts_with("-") || line.trim().starts_with("*") {
-                results.push(line.trim().trim_start_matches("-").trim_start_matches("*").trim().to_string());
+                results.push(
+                    line.trim()
+                        .trim_start_matches("-")
+                        .trim_start_matches("*")
+                        .trim()
+                        .to_string(),
+                );
             }
         }
     }
-    
+
     results
 }
 
 // Re-export Master Orchestrator integration
 pub use master_orchestrator::{
-    MasterOrchestratorCodeAnalysis, DefinitionList, SemanticAnalysisResult,
-    CodeIntentResult, DependencyAnalysis, QualityMetricsResult,
+    CodeIntentResult, DefinitionList, DependencyAnalysis, MasterOrchestratorCodeAnalysis,
+    QualityMetricsResult, SemanticAnalysisResult,
 };

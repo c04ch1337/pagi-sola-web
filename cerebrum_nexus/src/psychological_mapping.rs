@@ -81,28 +81,14 @@ impl SentimentModel {
             let mut pos = 0i32;
             let mut neg = 0i32;
             for w in [
-                "love",
-                "thank",
-                "grateful",
-                "relieved",
-                "happy",
-                "excited",
-                "good",
+                "love", "thank", "grateful", "relieved", "happy", "excited", "good",
             ] {
                 if t.contains(w) {
                     pos += 1;
                 }
             }
             for w in [
-                "sad",
-                "angry",
-                "mad",
-                "afraid",
-                "scared",
-                "anxious",
-                "alone",
-                "lonely",
-                "hurt",
+                "sad", "angry", "mad", "afraid", "scared", "anxious", "alone", "lonely", "hurt",
             ] {
                 if t.contains(w) {
                     neg += 1;
@@ -270,16 +256,8 @@ pub fn parse_drives(drives_text: &str) -> HashMap<String, f32> {
         .count() as f32;
         // Belonging: connection, being seen/accepted.
         let belonging = [
-            "belong",
-            "together",
-            "with you",
-            "accepted",
-            "include",
-            "lonely",
-            "alone",
-            "miss you",
-            "family",
-            "friend",
+            "belong", "together", "with you", "accepted", "include", "lonely", "alone", "miss you",
+            "family", "friend",
         ]
         .iter()
         .filter(|w| t.contains(**w))
@@ -351,7 +329,10 @@ mod tests {
             llm,
         };
 
-        let m = agent.map_drives("User: I feel lonely but I want to choose my path.").await.unwrap();
+        let m = agent
+            .map_drives("User: I feel lonely but I want to choose my path.")
+            .await
+            .unwrap();
         assert!((m["control"] - 0.3).abs() < 1e-6);
         assert!((m["belonging"] - 0.6).abs() < 1e-6);
         assert!((m["significance"] - 0.2).abs() < 1e-6);

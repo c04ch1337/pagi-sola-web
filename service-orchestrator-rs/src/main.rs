@@ -1,7 +1,7 @@
-use service_orchestrator_rs::scheduling::{Scheduler, ConnectorRegistry};
-use std::sync::Arc;
-use serde_json::json;
 use anyhow::Result;
+use serde_json::json;
+use service_orchestrator_rs::scheduling::{ConnectorRegistry, Scheduler};
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -12,11 +12,13 @@ async fn main() -> Result<()> {
     let scheduler = Scheduler::new(registry).await?;
 
     // Add a social media job
-    scheduler.add_social_job(
-        "tiktok",
-        "0 9 * * *", // Every day at 9 AM
-        json!({ "video": "path/to/video.mp4", "caption": "Daily insight from Phoenix ORCH!" })
-    ).await?;
+    scheduler
+        .add_social_job(
+            "tiktok",
+            "0 9 * * *", // Every day at 9 AM
+            json!({ "video": "path/to/video.mp4", "caption": "Daily insight from Phoenix ORCH!" }),
+        )
+        .await?;
 
     println!("Scheduler initialized and job added.");
 

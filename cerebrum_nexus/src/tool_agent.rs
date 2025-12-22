@@ -27,7 +27,12 @@ impl ToolAgentConfig {
         dotenvy::dotenv().ok();
         let mock = std::env::var("SIMULATED_TOOLS_MOCK")
             .ok()
-            .map(|s| matches!(s.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+            .map(|s| {
+                matches!(
+                    s.trim().to_ascii_lowercase().as_str(),
+                    "1" | "true" | "yes" | "on"
+                )
+            })
             .unwrap_or(false);
         Self {
             mock,
@@ -110,7 +115,12 @@ impl ToolAgent {
             "width": 768,
             "height": 768,
         }));
-        if let Some(k) = self.cfg.image_api_key.as_deref().filter(|s| !s.trim().is_empty()) {
+        if let Some(k) = self
+            .cfg
+            .image_api_key
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+        {
             req = req.bearer_auth(k);
         }
         let resp = req.send().await?;
@@ -176,7 +186,12 @@ impl ToolAgent {
         let mut req = self.client.post(url).json(&serde_json::json!({
             "text": text,
         }));
-        if let Some(k) = self.cfg.tts_api_key.as_deref().filter(|s| !s.trim().is_empty()) {
+        if let Some(k) = self
+            .cfg
+            .tts_api_key
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+        {
             req = req.bearer_auth(k);
         }
         let resp = req.send().await?;
@@ -214,36 +229,35 @@ impl ToolAgent {
             .await
             .map_err(|e| anyhow::anyhow!(e))?;
 
-        let v = serde_json::from_str::<serde_json::Value>(&txt)
-            .or_else(|_| {
-                // Best-effort extraction for cases where JSON is wrapped in prose.
-                let raw = txt.trim();
-                let bytes = raw.as_bytes();
-                let mut start: Option<usize> = None;
-                let mut depth: i32 = 0;
-                let mut end: Option<usize> = None;
-                for (i, &b) in bytes.iter().enumerate() {
-                    if b == b'{' {
-                        if start.is_none() {
-                            start = Some(i);
-                        }
-                        depth += 1;
-                    } else if b == b'}' {
-                        if depth > 0 {
-                            depth -= 1;
-                            if depth == 0 && start.is_some() {
-                                end = Some(i + 1);
-                                break;
-                            }
+        let v = serde_json::from_str::<serde_json::Value>(&txt).or_else(|_| {
+            // Best-effort extraction for cases where JSON is wrapped in prose.
+            let raw = txt.trim();
+            let bytes = raw.as_bytes();
+            let mut start: Option<usize> = None;
+            let mut depth: i32 = 0;
+            let mut end: Option<usize> = None;
+            for (i, &b) in bytes.iter().enumerate() {
+                if b == b'{' {
+                    if start.is_none() {
+                        start = Some(i);
+                    }
+                    depth += 1;
+                } else if b == b'}' {
+                    if depth > 0 {
+                        depth -= 1;
+                        if depth == 0 && start.is_some() {
+                            end = Some(i + 1);
+                            break;
                         }
                     }
                 }
-                let (Some(s), Some(e)) = (start, end) else {
-                    return Err(anyhow::anyhow!("narrative_event: no JSON object found"));
-                };
-                serde_json::from_str::<serde_json::Value>(&raw[s..e])
-                    .map_err(|e| anyhow::anyhow!("narrative_event JSON parse failed: {e}"))
-            })?;
+            }
+            let (Some(s), Some(e)) = (start, end) else {
+                return Err(anyhow::anyhow!("narrative_event: no JSON object found"));
+            };
+            serde_json::from_str::<serde_json::Value>(&raw[s..e])
+                .map_err(|e| anyhow::anyhow!("narrative_event JSON parse failed: {e}"))
+        })?;
 
         let title = v
             .get("title")
@@ -295,7 +309,12 @@ impl ToolAgent {
         let raw_flag = std::env::var("MASTER_ORCHESTRATOR_UNRESTRICTED_EXECUTION").ok();
         let is_unrestricted_execution_enabled = raw_flag
             .as_deref()
-            .map(|s| matches!(s.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+            .map(|s| {
+                matches!(
+                    s.trim().to_ascii_lowercase().as_str(),
+                    "1" | "true" | "yes" | "on"
+                )
+            })
             .unwrap_or(false);
 
         // Diagnostic logging: explains why command execution is blocked.
@@ -338,63 +357,65 @@ impl ToolAgent {
     }
 
     pub async fn process(&self, sub_command: &str, pid: Option<u32>) -> Result<ToolOutput> {
-    if self.cfg.mock {
-        return Ok(ToolOutput::Process(ProcessOutput::List(vec![
-            ProcessInfo {
-                pid: 1,
-                name: "mock_process_1".to_string(),
-                cpu_usage: 0.1,
-                memory_usage: 100,
-            },
-            ProcessInfo {
-                pid: 2,
-                name: "mock_process_2".to_string(),
-                cpu_usage: 0.2,
-                memory_usage: 200,
-            },
-        ])));
-    }
-
-    match sub_command {
-        "list" => {
-            let mut sys = System::new_all();
-            sys.refresh_all();
-            let processes = sys
-                .processes()
-                .iter()
-                .map(|(pid, process)| ProcessInfo {
-                    pid: pid.as_u32(),
-                    name: process.name().to_string(),
-                    cpu_usage: process.cpu_usage(),
-                    memory_usage: process.memory(),
-                })
-                .collect::<Vec<_>>();
-            Ok(ToolOutput::Process(ProcessOutput::List(processes)))
+        if self.cfg.mock {
+            return Ok(ToolOutput::Process(ProcessOutput::List(vec![
+                ProcessInfo {
+                    pid: 1,
+                    name: "mock_process_1".to_string(),
+                    cpu_usage: 0.1,
+                    memory_usage: 100,
+                },
+                ProcessInfo {
+                    pid: 2,
+                    name: "mock_process_2".to_string(),
+                    cpu_usage: 0.2,
+                    memory_usage: 200,
+                },
+            ])));
         }
-        "kill" => {
-            if let Some(p) = pid {
+
+        match sub_command {
+            "list" => {
                 let mut sys = System::new_all();
                 sys.refresh_all();
-                if let Some(process) = sys.process(Pid::from(p as usize)) {
-                    if process.kill() {
-                        Ok(ToolOutput::Process(ProcessOutput::Kill(Ok(()))))
+                let processes = sys
+                    .processes()
+                    .iter()
+                    .map(|(pid, process)| ProcessInfo {
+                        pid: pid.as_u32(),
+                        name: process.name().to_string(),
+                        cpu_usage: process.cpu_usage(),
+                        memory_usage: process.memory(),
+                    })
+                    .collect::<Vec<_>>();
+                Ok(ToolOutput::Process(ProcessOutput::List(processes)))
+            }
+            "kill" => {
+                if let Some(p) = pid {
+                    let mut sys = System::new_all();
+                    sys.refresh_all();
+                    if let Some(process) = sys.process(Pid::from(p as usize)) {
+                        if process.kill() {
+                            Ok(ToolOutput::Process(ProcessOutput::Kill(Ok(()))))
+                        } else {
+                            Ok(ToolOutput::Process(ProcessOutput::Kill(Err(format!(
+                                "Failed to kill process with PID {}",
+                                p
+                            )))))
+                        }
                     } else {
-                        Ok(ToolOutput::Process(ProcessOutput::Kill(Err(
-                            format!("Failed to kill process with PID {}", p),
-                        ))))
+                        Ok(ToolOutput::Process(ProcessOutput::Kill(Err(format!(
+                            "Process with PID {} not found",
+                            p
+                        )))))
                     }
                 } else {
-                    Ok(ToolOutput::Process(ProcessOutput::Kill(Err(
-                        format!("Process with PID {} not found", p),
-                    ))))
+                    Err(anyhow::anyhow!("PID is required for kill command"))
                 }
-            } else {
-                Err(anyhow::anyhow!("PID is required for kill command"))
             }
+            _ => Err(anyhow::anyhow!("Unknown sub_command: {}", sub_command)),
         }
-        _ => Err(anyhow::anyhow!("Unknown sub_command: {}", sub_command)),
     }
-}
 }
 
 #[cfg(test)]
@@ -440,7 +461,16 @@ mod tests {
             out: r#"{"title":"Gate","scene":"You see a gate.","choices":["Open it","Walk away"]}"#
                 .to_string(),
         });
-        let agent = ToolAgent::awaken(llm, ToolAgentConfig { mock: true, image_api_url: None, image_api_key: None, tts_api_url: None, tts_api_key: None });
+        let agent = ToolAgent::awaken(
+            llm,
+            ToolAgentConfig {
+                mock: true,
+                image_api_url: None,
+                image_api_key: None,
+                tts_api_url: None,
+                tts_api_key: None,
+            },
+        );
 
         let out = agent.narrative_event("seed").await.unwrap();
         match out {
@@ -452,4 +482,3 @@ mod tests {
         }
     }
 }
-

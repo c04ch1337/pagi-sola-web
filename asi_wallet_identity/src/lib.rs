@@ -31,7 +31,9 @@ impl WalletIdentity {
             format!("phoenix://wallet/{}", uuid::Uuid::new_v4())
         });
 
-        let x402_premium_key = std::env::var("X402_PREMIUM_KEY").ok().filter(|s| !s.is_empty());
+        let x402_premium_key = std::env::var("X402_PREMIUM_KEY")
+            .ok()
+            .filter(|s| !s.is_empty());
 
         Self {
             enabled,
@@ -49,7 +51,11 @@ impl WalletIdentity {
             "ASI identity: wallet_address={addr} chain={chain} x402={tier}",
             addr = self.wallet_address,
             chain = self.chain,
-            tier = if self.x402_premium_key.is_some() { "present" } else { "none" }
+            tier = if self.x402_premium_key.is_some() {
+                "present"
+            } else {
+                "none"
+            }
         )
     }
 
@@ -57,4 +63,3 @@ impl WalletIdentity {
         self.x402_premium_key.clone()
     }
 }
-

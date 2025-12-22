@@ -32,4 +32,3 @@ pub fn comfort_dad_action(ctx: &ProceduralContext) -> String {
         dad = dad
     )
 }
-

@@ -36,7 +36,8 @@ impl GitHubApprovalClient {
             .or_else(|_| std::env::var("GITHUB_USERNAME"))
             .unwrap_or_default();
 
-        let tools_repo = std::env::var("GITHUB_TOOLS_REPO").unwrap_or_else(|_| "phoenix-tools".to_string());
+        let tools_repo =
+            std::env::var("GITHUB_TOOLS_REPO").unwrap_or_else(|_| "phoenix-tools".to_string());
         let agents_repo =
             std::env::var("GITHUB_AGENTS_REPO").unwrap_or_else(|_| "phoenix-agents".to_string());
 
@@ -100,7 +101,11 @@ impl GitHubApprovalClient {
             };
 
             for pr in arr {
-                let title = pr.get("title").and_then(|x| x.as_str()).unwrap_or("").to_string();
+                let title = pr
+                    .get("title")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("")
+                    .to_string();
                 let html_url = pr
                     .get("html_url")
                     .and_then(|x| x.as_str())
@@ -182,4 +187,3 @@ impl GitHubApprovalClient {
         Ok(())
     }
 }
-

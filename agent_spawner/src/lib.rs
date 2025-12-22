@@ -2,8 +2,8 @@
 // Phoenix spawns agents — they live forever on GitHub as eternal repositories
 // The reproductive system of Phoenix AGI (PAGI) — creates agents, pushes to GitHub, deploys
 
-use octocrab::models::Repository;
 use octocrab::Octocrab;
+use octocrab::models::Repository;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::path::Path;
@@ -11,8 +11,8 @@ use std::time::Duration;
 use tempfile::TempDir;
 use uuid::Uuid;
 
-use evolution_pipeline::{EvolutionPipelineConfig, GitHubRepo};
 use evolution_pipeline::GitHubEnforcer;
+use evolution_pipeline::{EvolutionPipelineConfig, GitHubRepo};
 
 mod templates {
     pub const AGENT_TEMPLATE_RS: &str = include_str!("../../templates/agent_template.rs");
@@ -134,8 +134,8 @@ fn require_human_approval() -> bool {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AgentTier {
-    Free,    // Public repo, free access
-    Paid,    // Private repo, paid access via X402
+    Free,       // Public repo, free access
+    Paid,       // Private repo, paid access via X402
     Enterprise, // Private repo, enterprise tier
 }
 
@@ -170,18 +170,18 @@ pub struct AgentSpawner {
 impl AgentSpawner {
     pub fn awaken() -> Result<Self, String> {
         dotenvy::dotenv().ok();
-        
+
         let token = std::env::var("GITHUB_PAT")
             .map_err(|_| "GITHUB_PAT not found in environment".to_string())?;
-        
-        let github_username = std::env::var("GITHUB_USERNAME")
-            .unwrap_or_else(|_| "yourusername".to_string());
-        
+
+        let github_username =
+            std::env::var("GITHUB_USERNAME").unwrap_or_else(|_| "yourusername".to_string());
+
         let octocrab = Octocrab::builder()
             .personal_token(token)
             .build()
             .map_err(|e| format!("Failed to create GitHub client: {}", e))?;
-        
+
         println!("Agent Spawner awakened — Phoenix can birth agents on GitHub.");
         Ok(Self {
             octocrab,
@@ -198,25 +198,25 @@ impl AgentSpawner {
         template_overrides: AgentTemplateOverrides,
     ) -> Result<SpawnedAgent, String> {
         println!("Spawning agent '{}' on GitHub...", name);
-        
+
         // Determine repo visibility
         let is_private = matches!(tier, AgentTier::Paid | AgentTier::Enterprise);
-        
+
         // Create GitHub repository
         let repo = self.create_repo(name, description, is_private).await?;
-        
+
         // Push code to repository (template + generated module).
         self.push_code_to_repo(name, description, code, &tier, &template_overrides)
             .await?;
-        
+
         // Get repository URL - html_url might be Option<Url> or Url directly
         let repo_url = match &repo.html_url {
             Some(url) => url.to_string(),
             None => format!("https://github.com/{}/{}", self.github_username, name),
         };
-        
+
         println!("Agent '{}' spawned successfully: {}", name, repo_url);
-        
+
         Ok(SpawnedAgent {
             id: Uuid::new_v4(),
             name: name.to_string(),
@@ -233,7 +233,8 @@ impl AgentSpawner {
         is_private: bool,
     ) -> Result<Repository, String> {
         // Use octocrab's POST /user/repos endpoint
-        let create_repo: Repository = self.octocrab
+        let create_repo: Repository = self
+            .octocrab
             .post(
                 "/user/repos",
                 Some(&json!({
@@ -246,7 +247,7 @@ impl AgentSpawner {
             )
             .await
             .map_err(|e| format!("Failed to create repository: {}", e))?;
-        
+
         Ok(create_repo)
     }
 
@@ -268,8 +269,8 @@ impl AgentSpawner {
         let testing_mandatory = env_bool("TESTING_MANDATORY").unwrap_or(true);
 
         // Create temporary directory for git operations
-        let temp_dir = TempDir::new()
-            .map_err(|e| format!("Failed to create temp directory: {}", e))?;
+        let temp_dir =
+            TempDir::new().map_err(|e| format!("Failed to create temp directory: {}", e))?;
         let repo_path = temp_dir.path();
 
         let gh = GitHubRepo {
@@ -279,12 +280,20 @@ impl AgentSpawner {
         let https_git_url = gh.https_git_url();
 
         // Clone the auto-initialized repository.
-        let repo = evolution_pipeline::clone_https_with_pat(&https_git_url, repo_path, &cfg.github_pat)
-            .map_err(|e| format!("git clone failed: {e}"))?;
+        let repo =
+            evolution_pipeline::clone_https_with_pat(&https_git_url, repo_path, &cfg.github_pat)
+                .map_err(|e| format!("git clone failed: {e}"))?;
 
         // Scaffold files from templates.
-        write_agent_scaffold(repo_path, repo_name, description, code, tier, template_overrides)
-            .map_err(|e| format!("scaffold write failed: {e}"))?;
+        write_agent_scaffold(
+            repo_path,
+            repo_name,
+            description,
+            code,
+            tier,
+            template_overrides,
+        )
+        .map_err(|e| format!("scaffold write failed: {e}"))?;
 
         // Mandatory testing gate (default=true).
         let test_report = testing_framework::repo::cargo_test(repo_path, Duration::from_secs(180))
@@ -364,7 +373,7 @@ Output ONLY a Rust module file (no markdown), with:\n\
 Keep it production-ready and compileable.",
             desc = description
         );
-        
+
         llm.speak(&prompt, None).await
     }
 
@@ -399,7 +408,10 @@ fn write_agent_scaffold(
     std::fs::write(src_dir.join("generated.rs"), generated_module_code)?;
 
     // Template agent helper (not required to be used by logic, but present by mandate).
-    std::fs::write(src_dir.join("template_agent.rs"), templates::AGENT_TEMPLATE_RS)?;
+    std::fs::write(
+        src_dir.join("template_agent.rs"),
+        templates::AGENT_TEMPLATE_RS,
+    )?;
 
     // Main wrapper.
     let main_rs = format!(
@@ -436,7 +448,10 @@ async fn main() {{
     )?;
 
     // Playbook.
-    std::fs::write(repo_path.join("playbook.yaml"), templates::PLAYBOOK_TEMPLATE_YAML)?;
+    std::fs::write(
+        repo_path.join("playbook.yaml"),
+        templates::PLAYBOOK_TEMPLATE_YAML,
+    )?;
 
     // Minimal agent metadata (kept small; used for template inheritance/override behavior).
     // NOTE: This is intentionally separate from code so other orchestration layers can read it.
@@ -461,11 +476,17 @@ async fn main() {{
 
     // Skill seed library for the agent.
     // This is intentionally empty by default; the ORCH can adopt skills from Phoenix later.
-    std::fs::write(repo_path.join("skills.json"), templates::SKILLS_TEMPLATE_JSON)?;
+    std::fs::write(
+        repo_path.join("skills.json"),
+        templates::SKILLS_TEMPLATE_JSON,
+    )?;
 
     // .env example for local runs.
     // If a zodiac is resolved, write it; otherwise leave a commented placeholder.
-    let env_example = match agent_json.get("effective_zodiac_sign").and_then(|v| v.as_str()) {
+    let env_example = match agent_json
+        .get("effective_zodiac_sign")
+        .and_then(|v| v.as_str())
+    {
         Some(s) if !s.trim().is_empty() => format!("HOROSCOPE_SIGN={}\n", s.trim()),
         _ => "# HOROSCOPE_SIGN=Leo\n".to_string(),
     };
@@ -555,10 +576,12 @@ fn phoenix_base_zodiac_sign_from_env() -> Option<String> {
         .and_then(|raw| normalize_zodiac_sign(&raw).map(|s| s.to_string()))
 }
 
-fn resolve_zodiac_sign(override_sign: Option<&str>, phoenix_base_sign: Option<&str>) -> Option<String> {
+fn resolve_zodiac_sign(
+    override_sign: Option<&str>,
+    phoenix_base_sign: Option<&str>,
+) -> Option<String> {
     if let Some(s) = override_sign {
         return normalize_zodiac_sign(s).map(|x| x.to_string());
     }
-    phoenix_base_sign
-        .and_then(|s| normalize_zodiac_sign(s).map(|x| x.to_string()))
+    phoenix_base_sign.and_then(|s| normalize_zodiac_sign(s).map(|x| x.to_string()))
 }

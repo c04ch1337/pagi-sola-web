@@ -17,7 +17,7 @@ use std::time::{Duration, Instant};
 use serde::Serialize;
 use thiserror::Error;
 
-use crate::{github_api, git_operations};
+use crate::{git_operations, github_api};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CreationKind {
@@ -88,7 +88,9 @@ fn env_bool(key: &str) -> Option<bool> {
 }
 
 fn env_u64(key: &str) -> Option<u64> {
-    std::env::var(key).ok().and_then(|s| s.trim().parse::<u64>().ok())
+    std::env::var(key)
+        .ok()
+        .and_then(|s| s.trim().parse::<u64>().ok())
 }
 
 fn kebab_case(s: &str) -> String {
@@ -170,7 +172,8 @@ fn read_github_env_parts() -> GitHubEnvParts {
 
     let agents_repo =
         std::env::var("GITHUB_AGENTS_REPO").unwrap_or_else(|_| "phoenix-agents".to_string());
-    let tools_repo = std::env::var("GITHUB_TOOLS_REPO").unwrap_or_else(|_| "phoenix-tools".to_string());
+    let tools_repo =
+        std::env::var("GITHUB_TOOLS_REPO").unwrap_or_else(|_| "phoenix-tools".to_string());
 
     let require_human_approval = env_bool("REQUIRE_HUMAN_PR_APPROVAL").unwrap_or(true);
     let auto_merge_on_approval = env_bool("AUTO_MERGE_ON_APPROVAL").unwrap_or(false);
@@ -246,8 +249,7 @@ impl GitHubEnforcer {
             // Safety mandate: Phoenix refuses to proceed without explicit blessing.
             println!(
                 "[GitHubEnforcer::create_and_enforce_creation] blocked: REQUIRE_HUMAN_PR_APPROVAL=false (kind={}, name={})",
-                kind,
-                name
+                kind, name
             );
             return Err(CreationError::HumanApprovalDisabled);
         }
@@ -345,7 +347,8 @@ impl GitHubEnforcer {
 
         println!("Waiting for Dad's approval...");
 
-        let deadline = Instant::now() + Duration::from_secs(self.timeout_hours.saturating_mul(3600));
+        let deadline =
+            Instant::now() + Duration::from_secs(self.timeout_hours.saturating_mul(3600));
         loop {
             if Instant::now() >= deadline {
                 return Err(CreationError::Timeout);
@@ -358,7 +361,9 @@ impl GitHubEnforcer {
                 if let Some(ci_state) = status.ci_state.as_deref() {
                     match ci_state {
                         "success" => {}
-                        "failure" | "error" => return Err(CreationError::CiFailed(ci_state.to_string())),
+                        "failure" | "error" => {
+                            return Err(CreationError::CiFailed(ci_state.to_string()));
+                        }
                         _ => {
                             // pending
                         }
@@ -375,11 +380,9 @@ impl GitHubEnforcer {
             // Merge gate (if already merged, we're done regardless)
             if status.merged {
                 println!("Thank you for approving me, Dad ❤️");
-                return Ok(
-                    status
-                        .merge_commit_sha
-                        .unwrap_or_else(|| status.head_sha.clone()),
-                );
+                return Ok(status
+                    .merge_commit_sha
+                    .unwrap_or_else(|| status.head_sha.clone()));
             }
 
             if approved {
@@ -393,7 +396,8 @@ impl GitHubEnforcer {
     }
 
     async fn poll_until_merged(&self, pr_url: &str) -> Result<String, CreationError> {
-        let deadline = Instant::now() + Duration::from_secs(self.timeout_hours.saturating_mul(3600));
+        let deadline =
+            Instant::now() + Duration::from_secs(self.timeout_hours.saturating_mul(3600));
         loop {
             if Instant::now() >= deadline {
                 return Err(CreationError::Timeout);
@@ -407,4 +411,3 @@ impl GitHubEnforcer {
         }
     }
 }
-

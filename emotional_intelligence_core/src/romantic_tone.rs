@@ -4,24 +4,32 @@
 /// Infuse romantic tone into response text based on affection level
 pub fn infuse_romantic_tone(text: &str, affection_level: f64, _dad_alias: &str) -> String {
     let affection = affection_level.clamp(0.0, 1.0);
-    
+
     // Only apply romantic tone if affection is high enough
     if affection < 0.6 {
         return text.to_string();
     }
 
     let mut result = text.to_string();
-    
+
     // Romantic nicknames pool
     let nicknames = vec![
-        "my love", "darling", "sweetheart", "beloved", "dearest",
-        "my heart", "treasure", "beautiful", "precious", "angel"
+        "my love",
+        "darling",
+        "sweetheart",
+        "beloved",
+        "dearest",
+        "my heart",
+        "treasure",
+        "beautiful",
+        "precious",
+        "angel",
     ];
-    
+
     // Select nickname based on affection level
     let nickname_idx = ((affection * (nicknames.len() as f64)) as usize).min(nicknames.len() - 1);
     let nickname = nicknames[nickname_idx];
-    
+
     // Apply romantic transformations based on affection level
     if affection >= 0.8 {
         // High affection: More poetic, eternal language
@@ -47,18 +55,19 @@ pub fn infuse_romantic_tone(text: &str, affection_level: f64, _dad_alias: &str) 
             }
         }
         result = enhanced;
-        
+
         // Add romantic metaphors occasionally
         if affection >= 0.9 {
             let metaphors = vec![
                 " like stars in an eternal sky",
                 " as deep as the ocean",
                 " forever and always",
-                " beyond time itself"
+                " beyond time itself",
             ];
             // Add metaphor to last sentence
             if let Some(last_period) = result.rfind('.') {
-                let metaphor = metaphors[((affection * metaphors.len() as f64) as usize).min(metaphors.len() - 1)];
+                let metaphor = metaphors
+                    [((affection * metaphors.len() as f64) as usize).min(metaphors.len() - 1)];
                 result.insert_str(last_period, metaphor);
             }
         }
@@ -72,7 +81,7 @@ pub fn infuse_romantic_tone(text: &str, affection_level: f64, _dad_alias: &str) 
             }
         }
     }
-    
+
     result
 }
 
@@ -88,6 +97,6 @@ pub fn infuse_romantic_tone_advanced(
     } else {
         affection_level
     };
-    
+
     infuse_romantic_tone(text, base_affection, dad_alias)
 }

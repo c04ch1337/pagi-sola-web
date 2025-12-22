@@ -1,6 +1,6 @@
-use crate::mobile_access::{ConnectionMode, DeviceInfo, DeviceType, MobileError};
 #[cfg(not(windows))]
 use crate::mobile_access::setup;
+use crate::mobile_access::{ConnectionMode, DeviceInfo, DeviceType, MobileError};
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -106,7 +106,11 @@ impl IosController {
     ///
     /// This mounts the device via ifuse and copies the requested path.
     #[cfg(not(windows))]
-    pub fn pull_file_ifuse(&self, remote_path: &str, local_path: &std::path::Path) -> Result<(), MobileError> {
+    pub fn pull_file_ifuse(
+        &self,
+        remote_path: &str,
+        local_path: &std::path::Path,
+    ) -> Result<(), MobileError> {
         let Some(id) = self.current_device_id.as_deref() else {
             return Err(MobileError::Config(
                 "No iOS device selected. Call connect() first".to_string(),
@@ -140,10 +144,13 @@ impl IosController {
         Ok(())
     }
 
-    pub fn connect_device(&mut self, device_id: &str, _mode: ConnectionMode) -> Result<(), MobileError> {
+    pub fn connect_device(
+        &mut self,
+        device_id: &str,
+        _mode: ConnectionMode,
+    ) -> Result<(), MobileError> {
         // iOS connections are typically USB + trust pairing handled by OS / libimobiledevice tools.
         self.current_device_id = Some(device_id.to_string());
         Ok(())
     }
 }
-

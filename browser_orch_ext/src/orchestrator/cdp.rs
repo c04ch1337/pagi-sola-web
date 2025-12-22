@@ -1,8 +1,7 @@
 use anyhow::{anyhow, Result};
 use futures::{
     stream::{SplitSink, SplitStream},
-    SinkExt,
-    StreamExt,
+    SinkExt, StreamExt,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -30,7 +29,7 @@ pub enum CdpResponse {
 /// A connection to a CDP server.
 pub struct CdpConnection {
     #[allow(dead_code)]
-    request: Request<()>,    
+    request: Request<()>,
     ws_sender: SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>,
     ws_receiver: SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>,
     counter: AtomicI64,
@@ -39,8 +38,8 @@ pub struct CdpConnection {
 impl CdpConnection {
     pub async fn new(mut url: String) -> Result<(Self, Response<Option<Vec<u8>>>)> {
         if !url.starts_with("ws://") && !url.starts_with("wss://") {
-            let resp = reqwest::get(format!("http://{}/json/version", url).replace("ws://", ""))
-                .await?;
+            let resp =
+                reqwest::get(format!("http://{}/json/version", url).replace("ws://", "")).await?;
 
             let json: serde_json::Value = resp.json().await?;
             url = json["webSocketDebuggerUrl"].as_str().unwrap().to_owned();
@@ -68,7 +67,9 @@ impl CdpConnection {
         method: &str,
         params: T,
     ) -> Result<serde_json::Value> {
-        let id = self.counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let id = self
+            .counter
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let message = serde_json::to_string(&serde_json::json!({
             "id": id,
             "method": method,
@@ -103,15 +104,16 @@ impl CdpConnection {
     pub async fn get_page_state(&mut self) -> Result<Value, anyhow::Error> {
         let state_js = include_str!("./get_state.js");
 
-        let result = self.send_message(
-            "Runtime.evaluate",
-            serde_json::json!({
-                "expression": state_js,
-                "awaitPromise": true,
-                "returnByValue": true,
-            }),
-        )
-        .await?;
+        let result = self
+            .send_message(
+                "Runtime.evaluate",
+                serde_json::json!({
+                    "expression": state_js,
+                    "awaitPromise": true,
+                    "returnByValue": true,
+                }),
+            )
+            .await?;
         Ok(result)
     }
 }

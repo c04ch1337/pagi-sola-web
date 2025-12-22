@@ -76,7 +76,10 @@ impl Embedder for StubEmbedder {
         // Simple token hashing + L2 normalize.
         let mut v = vec![0.0f32; self.dim];
         let lower = text.to_ascii_lowercase();
-        for token in lower.split(|c: char| !c.is_alphanumeric()).filter(|t| !t.is_empty()) {
+        for token in lower
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|t| !t.is_empty())
+        {
             let h = fxhash32(token.as_bytes());
             let idx = (h as usize) % self.dim;
             v[idx] += 1.0;
@@ -141,7 +144,8 @@ impl VectorKB {
     /// dependencies to align with the Phase 2 plan and allow future swapping.
     pub fn new(path: &str) -> Result<Self> {
         let p = Path::new(path);
-        std::fs::create_dir_all(p).map_err(|e| VectorKbError::Config(format!("failed to create db dir: {e}")))?;
+        std::fs::create_dir_all(p)
+            .map_err(|e| VectorKbError::Config(format!("failed to create db dir: {e}")))?;
 
         let db = sled::open(p.join("vector_kb.sled"))?;
         let tree = db.open_tree("entries")?;
@@ -279,7 +283,11 @@ impl VectorKB {
             })
             .collect::<Vec<_>>();
 
-        scored.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        scored.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         scored.truncate(top_k);
         Ok(scored)
     }
@@ -310,9 +318,12 @@ impl VectorKB {
             })
             .collect::<Vec<_>>();
 
-        scored.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        scored.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         scored.truncate(top_k);
         Ok(scored)
     }
 }
-

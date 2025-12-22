@@ -2,17 +2,17 @@ use dashmap::DashMap;
 use ed25519_dalek::Signer as _;
 use serde::Serialize;
 use std::net::SocketAddr;
-use std::sync::Arc;
 use std::pin::Pin;
+use std::sync::Arc;
 use tokio::sync::mpsc;
-use tokio_stream::wrappers::ReceiverStream;
 use tokio_stream::StreamExt as _;
+use tokio_stream::wrappers::ReceiverStream;
 use tonic::transport::{Certificate, Identity, Server, ServerTlsConfig};
 use tonic::{Request, Response, Status};
 use tracing::{info, warn};
 
 use swarm_control_proto::swarm_control::swarm_control_server::{SwarmControl, SwarmControlServer};
-use swarm_control_proto::swarm_control::{control_message, Command, ControlMessage, StatusUpdate};
+use swarm_control_proto::swarm_control::{Command, ControlMessage, StatusUpdate, control_message};
 
 #[derive(Clone)]
 struct ControlState {
@@ -31,7 +31,8 @@ struct ControlSvc {
 
 #[tonic::async_trait]
 impl SwarmControl for ControlSvc {
-    type StreamControlStream = Pin<Box<dyn tokio_stream::Stream<Item = Result<ControlMessage, Status>> + Send + 'static>>;
+    type StreamControlStream =
+        Pin<Box<dyn tokio_stream::Stream<Item = Result<ControlMessage, Status>> + Send + 'static>>;
 
     async fn stream_control(
         &self,
@@ -46,7 +47,9 @@ impl SwarmControl for ControlSvc {
                 .unwrap_or("");
             let expected_header = format!("Bearer {expected}");
             if auth != expected_header {
-                return Err(Status::unauthenticated("missing/invalid authorization token"));
+                return Err(Status::unauthenticated(
+                    "missing/invalid authorization token",
+                ));
             }
         }
 
@@ -143,7 +146,8 @@ impl ControlState {
             ts_unix: chrono::Utc::now().timestamp(),
             note: "internal takeover injected".to_string(),
         };
-        let signed_payload = serde_json::to_vec(&payload).map_err(|e| format!("payload serialize failed: {e}"))?;
+        let signed_payload =
+            serde_json::to_vec(&payload).map_err(|e| format!("payload serialize failed: {e}"))?;
         let signature = signing_key.sign(&signed_payload);
 
         let cmd = Command {
@@ -225,4 +229,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-

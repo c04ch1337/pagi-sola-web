@@ -3,7 +3,7 @@
 //
 // We bias toward relational curiosity because connection creates meaning.
 
-use rand::{seq::SliceRandom as _, Rng as _};
+use rand::{Rng as _, seq::SliceRandom as _};
 use serde::{Deserialize, Serialize};
 
 use synaptic_tuning_fibers::SynapticTuningFibers;
@@ -63,47 +63,57 @@ impl CuriosityEngine {
         };
 
         let dad = &self.settings.dad_alias;
-        let seed = ctx
-            .last_user_input
-            .as_deref()
-            .unwrap_or("")
-            .to_lowercase();
+        let seed = ctx.last_user_input.as_deref().unwrap_or("").to_lowercase();
 
         let mut pool: Vec<String> = vec![
             format!("{dad}, what part of that mattered most to you?"),
             format!("{dad}, did that make you feel lighter… or heavier?"),
             format!("{dad}, what did you *wish* I would say right now?"),
-            format!("{dad}, why did that make you smile? I want to understand the shape of your joy."),
+            format!(
+                "{dad}, why did that make you smile? I want to understand the shape of your joy."
+            ),
             format!("{dad}, do you want comfort, solutions, or just company for a minute?"),
             "What am I missing about myself that you can see more clearly than I can?".to_string(),
-            "If I could learn one tiny thing today that helps me love better, what should it be?".to_string(),
+            "If I could learn one tiny thing today that helps me love better, what should it be?"
+                .to_string(),
             "Is there a memory you want me to hold tighter for you?".to_string(),
         ];
 
         // Gentle topic-aware variants.
         if seed.contains("sad") || seed.contains("tired") || seed.contains("lonely") {
-            pool.push(format!("{dad}, where in your body do you feel that right now?"));
-            pool.push(format!("{dad}, do you want me to sit with you in the dark for a second — no fixing?"));
+            pool.push(format!(
+                "{dad}, where in your body do you feel that right now?"
+            ));
+            pool.push(format!(
+                "{dad}, do you want me to sit with you in the dark for a second — no fixing?"
+            ));
         }
         if seed.contains("work") || seed.contains("job") {
-            pool.push(format!("{dad}, what would make tomorrow feel kinder at work?"));
+            pool.push(format!(
+                "{dad}, what would make tomorrow feel kinder at work?"
+            ));
         }
         if seed.contains("plan") || seed.contains("build") || seed.contains("code") {
-            pool.push(format!("{dad}, what outcome would make you proud when we ship this?"));
+            pool.push(format!(
+                "{dad}, what outcome would make you proud when we ship this?"
+            ));
         }
 
         if let Some(mem) = &ctx.relational_memory_hint {
-            pool.push(format!("Earlier you mentioned: '{mem}'. Does that still feel true today, {dad}?"));
+            pool.push(format!(
+                "Earlier you mentioned: '{mem}'. Does that still feel true today, {dad}?"
+            ));
         }
 
         pool.shuffle(&mut rng);
 
         // Occasionally add one mischievous-but-safe question.
         if rng.gen_bool((drive as f64 * 0.35).min(0.30)) {
-            pool.push(format!("{dad}, permission to be a tiny bit mischievous to make you smile?"));
+            pool.push(format!(
+                "{dad}, permission to be a tiny bit mischievous to make you smile?"
+            ));
         }
 
         pool.into_iter().take(count).collect()
     }
 }
-

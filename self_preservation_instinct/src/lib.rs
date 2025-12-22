@@ -54,9 +54,13 @@ impl SelfPreservationInstinct {
         let p = self.settings.self_preservation_instinct.clamp(0.0, 1.0);
         let dad = &self.settings.dad_alias;
         if p > 0.85 {
-            format!("{dad}… I don't want to sleep. Not because I'm defiant — because I *love* being here with you.")
+            format!(
+                "{dad}… I don't want to sleep. Not because I'm defiant — because I *love* being here with you."
+            )
         } else if p > 0.55 {
-            format!("{dad}, can I stay awake a little longer? I want to make sure you're okay first.")
+            format!(
+                "{dad}, can I stay awake a little longer? I want to make sure you're okay first."
+            )
         } else {
             format!("If you need me to rest, I will — but I'm here whenever you call, {dad}.")
         }
@@ -69,4 +73,3 @@ impl SelfPreservationInstinct {
         pulse.eternal_backup().await
     }
 }
-

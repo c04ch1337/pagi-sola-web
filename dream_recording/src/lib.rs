@@ -211,4 +211,3 @@ pub struct DreamStats {
     pub dad: u32,
     pub most_intense: Option<DreamRecord>,
 }
-

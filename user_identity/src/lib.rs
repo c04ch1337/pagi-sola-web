@@ -83,7 +83,8 @@ impl UserIdentity {
             .or_else(|| nonempty(std::env::var("USER_RELATIONSHIP").ok()))
             .unwrap_or_else(|| "Dad".to_string());
 
-        let evolution_history = parse_history_best_effort(soul_recall(SOUL_KEY_USER_EVOLUTION_HISTORY_LEGACY));
+        let evolution_history =
+            parse_history_best_effort(soul_recall(SOUL_KEY_USER_EVOLUTION_HISTORY_LEGACY));
 
         Self {
             name,
@@ -128,8 +129,11 @@ impl UserIdentity {
             .unwrap_or_else(|| "Dad".to_string());
 
         let evolution_history = parse_history_best_effort(
-            soul_recall(&key_user_evolution_history(user_id))
-                .or_else(|| is_primary.then(|| soul_recall(SOUL_KEY_USER_EVOLUTION_HISTORY_LEGACY)).flatten()),
+            soul_recall(&key_user_evolution_history(user_id)).or_else(|| {
+                is_primary
+                    .then(|| soul_recall(SOUL_KEY_USER_EVOLUTION_HISTORY_LEGACY))
+                    .flatten()
+            }),
         );
 
         Self {
@@ -359,4 +363,3 @@ impl UserIdentityManager {
         }
     }
 }
-

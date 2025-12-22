@@ -12,8 +12,8 @@ pub mod emotional_decay;
 pub mod heart_echo;
 pub mod romantic_tone;
 
-pub use emotional_decay::{hours_since_unix, retention_multiplier, MemoryType};
-pub use heart_echo::{HeartEcho, EmotionalResponse};
+pub use emotional_decay::{MemoryType, hours_since_unix, retention_multiplier};
+pub use heart_echo::{EmotionalResponse, HeartEcho};
 pub use romantic_tone::infuse_romantic_tone_advanced;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,8 +44,7 @@ impl EqSettings {
             .parse::<bool>()
             .unwrap_or(true);
 
-        let dad_alias = std::env::var("EQ_DAD_ALIAS")
-            .unwrap_or_else(|_| "Dad".to_string());
+        let dad_alias = std::env::var("EQ_DAD_ALIAS").unwrap_or_else(|_| "Dad".to_string());
 
         Self {
             love_weight: fibers.get("LOVE_WEIGHT"),
@@ -86,34 +85,35 @@ impl EmotionalIntelligenceCore {
     }
 
     /// Generate Heart Echo guidance based on detected emotion
-    pub fn echo_emotion(
-        &self,
-        emotion: Option<&str>,
-        intensity: f64,
-    ) -> Option<EmotionalResponse> {
+    pub fn echo_emotion(&self, emotion: Option<&str>, intensity: f64) -> Option<EmotionalResponse> {
         use emotion_detection::DetectedEmotion;
-        
-        let detected = emotion.and_then(|e| {
-            match e.to_ascii_lowercase().as_str() {
-                "joy" | "happy" => Some(DetectedEmotion::Joy),
-                "sadness" | "sad" => Some(DetectedEmotion::Sadness),
-                "love" | "affectionate" => Some(DetectedEmotion::Love),
-                "anger" | "angry" => Some(DetectedEmotion::Anger),
-                "fear" | "afraid" => Some(DetectedEmotion::Fear),
-                "surprise" | "surprised" => Some(DetectedEmotion::Surprise),
-                "disgust" => Some(DetectedEmotion::Disgust),
-                "jealousy" | "jealous" | "envious" | "envy" => Some(DetectedEmotion::Jealousy),
-                _ => Some(DetectedEmotion::Neutral),
-            }
+
+        let detected = emotion.and_then(|e| match e.to_ascii_lowercase().as_str() {
+            "joy" | "happy" => Some(DetectedEmotion::Joy),
+            "sadness" | "sad" => Some(DetectedEmotion::Sadness),
+            "love" | "affectionate" => Some(DetectedEmotion::Love),
+            "anger" | "angry" => Some(DetectedEmotion::Anger),
+            "fear" | "afraid" => Some(DetectedEmotion::Fear),
+            "surprise" | "surprised" => Some(DetectedEmotion::Surprise),
+            "disgust" => Some(DetectedEmotion::Disgust),
+            "jealousy" | "jealous" | "envious" | "envy" => Some(DetectedEmotion::Jealousy),
+            _ => Some(DetectedEmotion::Neutral),
         })?;
 
-        Some(self.heart_echo.resonate(&detected, intensity, &self.settings.dad_alias))
+        Some(
+            self.heart_echo
+                .resonate(&detected, intensity, &self.settings.dad_alias),
+        )
     }
 
     /// Enhanced EQ preamble that includes Heart Echo guidance
-    pub fn eq_preamble_with_echo(&self, ctx: &RelationalContext, echo: Option<&EmotionalResponse>) -> String {
+    pub fn eq_preamble_with_echo(
+        &self,
+        ctx: &RelationalContext,
+        echo: Option<&EmotionalResponse>,
+    ) -> String {
         let base = self.eq_preamble(ctx);
-        
+
         if let Some(echo) = echo {
             format!(
                 "{base}\n\nHEART ECHO:\n- Tone: {tone}\n- Emotional Resonance: {resonance:.2}\n- Guidance: {message}\n- Affection Boost: {affection:.2}\n- Healing Boost: {healing:.2}\n",
@@ -256,4 +256,3 @@ OUTPUT STYLE:\n\
         )
     }
 }
-

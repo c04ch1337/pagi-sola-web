@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context as _};
+use anyhow::{Context as _, anyhow};
 
 /// Verify an Ed25519 signature over `payload` using the QUEEN's public key.
 ///
@@ -31,17 +31,9 @@ pub fn verify_payload(
         ));
     }
 
-    let vk = VerifyingKey::from_bytes(
-        public_key
-            .try_into()
-            .expect("length checked above"),
-    )
-    .map_err(|e| anyhow!("invalid Ed25519 public key bytes: {e}"))?;
-    let sig = Signature::from_bytes(
-        signature
-            .try_into()
-            .expect("length checked above"),
-    );
+    let vk = VerifyingKey::from_bytes(public_key.try_into().expect("length checked above"))
+        .map_err(|e| anyhow!("invalid Ed25519 public key bytes: {e}"))?;
+    let sig = Signature::from_bytes(signature.try_into().expect("length checked above"));
     Ok(vk.verify(payload, &sig).is_ok())
 }
 
@@ -59,4 +51,3 @@ pub fn decode_b64(s: &str) -> Result<Vec<u8>, anyhow::Error> {
         .or_else(|_| base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(s))
         .with_context(|| "invalid base64/base64url")
 }
-

@@ -1,4 +1,3 @@
-
 use serde::Serialize;
 use std::env;
 use sysinfo::{Pid, System};
@@ -76,12 +75,10 @@ fn main() {
             }
             let pid_str = &args[2];
             match pid_str.parse::<u32>() {
-                Ok(pid) => {
-                    match kill_process(pid) {
-                        Ok(()) => println!("Process with PID {} killed successfully.", pid),
-                        Err(e) => println!("Error: {}", e),
-                    }
-                }
+                Ok(pid) => match kill_process(pid) {
+                    Ok(()) => println!("Process with PID {} killed successfully.", pid),
+                    Err(e) => println!("Error: {}", e),
+                },
                 Err(_) => {
                     println!("Invalid PID: {}", pid_str);
                 }

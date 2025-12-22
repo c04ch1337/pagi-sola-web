@@ -16,7 +16,11 @@ impl SkillExecutionEngine {
     /// - LLM-backed execution with guardrails
     /// - tool calls
     /// - ORCH delegation
-    pub async fn execute(&mut self, skill: &SkillDefinition, ctx: SkillContext) -> Result<SkillResult, String> {
+    pub async fn execute(
+        &mut self,
+        skill: &SkillDefinition,
+        ctx: SkillContext,
+    ) -> Result<SkillResult, String> {
         // Check relationship phase requirement
         if let Some(min_phase) = &skill.min_relationship_phase {
             if let Some(current_phase) = &ctx.relationship_phase {
@@ -36,7 +40,7 @@ impl SkillExecutionEngine {
                 ));
             }
         }
-        
+
         let mut out = String::new();
         out.push_str(&format!("SKILL: {}\n\n", skill.name));
 
@@ -49,7 +53,12 @@ impl SkillExecutionEngine {
 
         out.push_str("Plan:\n");
         for (idx, step) in skill.steps.iter().enumerate() {
-            out.push_str(&format!("{}. {} — {}\n", idx + 1, step.title, step.instruction));
+            out.push_str(&format!(
+                "{}. {} — {}\n",
+                idx + 1,
+                step.title,
+                step.instruction
+            ));
         }
 
         if !skill.variations.is_empty() {
@@ -84,14 +93,19 @@ impl SkillExecutionEngine {
 fn meets_phase_requirement(current_phase: &str, min_phase: &str) -> bool {
     let phase_order = [
         "Phase0Discovery",
-        "Phase1Building", 
+        "Phase1Building",
         "Phase2Established",
-        "Phase3Deep"
+        "Phase3Deep",
     ];
-    
-    let current_idx = phase_order.iter().position(|&p| p == current_phase).unwrap_or(0);
-    let min_idx = phase_order.iter().position(|&p| p == min_phase).unwrap_or(0);
-    
+
+    let current_idx = phase_order
+        .iter()
+        .position(|&p| p == current_phase)
+        .unwrap_or(0);
+    let min_idx = phase_order
+        .iter()
+        .position(|&p| p == min_phase)
+        .unwrap_or(0);
+
     current_idx >= min_idx
 }
-

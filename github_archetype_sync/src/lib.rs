@@ -5,10 +5,10 @@
 //! - Push local changes back to GitHub (federated learning contributions)
 //! - Sync archetype configurations across instances
 
+use config_manager::{AGIConfig, PersonalityDatabase};
+use error_types::{ConfigError, PhoenixError};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use error_types::{ConfigError, PhoenixError};
-use config_manager::{AGIConfig, PersonalityDatabase};
 
 /// Archetype synchronization client for GitHub operations.
 #[derive(Debug, Clone)]
@@ -63,8 +63,8 @@ impl ArchetypeSync {
         let repo = std::env::var("PHOENIX_ARCHETYPE_REPO")
             .unwrap_or_else(|_| "phoenix-archetypes".to_string());
 
-        let branch = std::env::var("PHOENIX_ARCHETYPE_BRANCH")
-            .unwrap_or_else(|_| "main".to_string());
+        let branch =
+            std::env::var("PHOENIX_ARCHETYPE_BRANCH").unwrap_or_else(|_| "main".to_string());
 
         let user_agent = std::env::var("GITHUB_USER_AGENT")
             .unwrap_or_else(|_| "phoenix-agi-archetype-sync".to_string());
@@ -138,19 +138,22 @@ impl ArchetypeSync {
             .header("User-Agent", &self.user_agent)
             .send()
             .await
-            .map_err(|e| ConfigError::DownloadFailed(format!("Failed to download personality: {}", e)))?
+            .map_err(|e| {
+                ConfigError::DownloadFailed(format!("Failed to download personality: {}", e))
+            })?
             .text()
             .await
-            .map_err(|e| ConfigError::DownloadFailed(format!("Failed to read personality: {}", e)))?;
+            .map_err(|e| {
+                ConfigError::DownloadFailed(format!("Failed to read personality: {}", e))
+            })?;
 
-        let personality_db: PersonalityDatabase = serde_json::from_str(&personality_json)
-            .map_err(|e| ConfigError::ParseError(format!("Failed to parse personality_db.json: {}", e)))?;
+        let personality_db: PersonalityDatabase =
+            serde_json::from_str(&personality_json).map_err(|e| {
+                ConfigError::ParseError(format!("Failed to parse personality_db.json: {}", e))
+            })?;
 
         // Get latest commit SHA for the archetype directory (optional)
-        let commit_sha = self
-            .get_latest_commit_sha(archetype_name)
-            .await
-            .ok();
+        let commit_sha = self.get_latest_commit_sha(archetype_name).await.ok();
 
         Ok(PullResult {
             master_system_prompt: master_prompt,
@@ -215,9 +218,7 @@ impl ArchetypeSync {
         // Create a branch for the contribution
         let branch_name = format!(
             "federated-learning/{}/{}-{}",
-            archetype_name,
-            contribution.contribution_type,
-            contribution.instance_id
+            archetype_name, contribution.contribution_type, contribution.instance_id
         );
 
         // Create PR via GitHub API
@@ -244,8 +245,7 @@ impl ArchetypeSync {
             contribution.instance_id,
             contribution.contribution_type,
             contribution.timestamp,
-            serde_json::to_string_pretty(&contribution.data)
-                .unwrap_or_else(|_| "{}".to_string()),
+            serde_json::to_string_pretty(&contribution.data).unwrap_or_else(|_| "{}".to_string()),
             serde_json::to_string_pretty(&contribution.metadata)
                 .unwrap_or_else(|_| "{}".to_string())
         );
@@ -269,10 +269,9 @@ impl ArchetypeSync {
             .map_err(|e| ConfigError::GitHubApiError(format!("Failed to create PR: {}", e)))?;
 
         if response.status().is_success() {
-            let pr_json: serde_json::Value = response
-                .json()
-                .await
-                .map_err(|e| ConfigError::ParseError(format!("Failed to parse PR response: {}", e)))?;
+            let pr_json: serde_json::Value = response.json().await.map_err(|e| {
+                ConfigError::ParseError(format!("Failed to parse PR response: {}", e))
+            })?;
 
             Ok(pr_json
                 .get("html_url")
@@ -284,11 +283,7 @@ impl ArchetypeSync {
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
-            Err(ConfigError::GitHubApiError(format!(
-                "PR creation failed: {}",
-                error_text
-            ))
-            .into())
+            Err(ConfigError::GitHubApiError(format!("PR creation failed: {}", error_text)).into())
         }
     }
 

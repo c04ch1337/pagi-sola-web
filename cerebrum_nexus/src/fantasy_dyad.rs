@@ -245,7 +245,10 @@ mod tests {
         // Apply several turns to converge.
         let mut prompt = String::new();
         for _ in 0..5 {
-            prompt = agent.co_adapt_persona(&drives(0.2, 0.9, 0.2)).await.unwrap();
+            prompt = agent
+                .co_adapt_persona(&drives(0.2, 0.9, 0.2))
+                .await
+                .unwrap();
         }
         assert!(prompt.contains("DYAD_ADAPTATION"));
         assert!(prompt.contains("STYLE RULES"));
@@ -275,4 +278,3 @@ mod tests {
         assert!(last.contains("autonomy_support"));
     }
 }
-

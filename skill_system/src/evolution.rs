@@ -24,7 +24,10 @@ impl SkillEvolutionSystem {
     /// Current strategy (conservative):
     /// - If love_score is high but utility_score is low, add a "more actionable" variation.
     /// - If utility is high but love is low, add a "warmer tone" variation.
-    pub async fn evolve_skill(&mut self, mut skill: SkillDefinition) -> Result<SkillEvolution, String> {
+    pub async fn evolve_skill(
+        &mut self,
+        mut skill: SkillDefinition,
+    ) -> Result<SkillEvolution, String> {
         let ts = Utc::now();
 
         let mut kind = "noop".to_string();
@@ -43,13 +46,12 @@ impl SkillEvolutionSystem {
             v.variations.push(SkillVariation {
                 name: "micro_steps".to_string(),
                 when_to_use: "When the user asks: what should I do next?".to_string(),
-                steps_override: Some(vec![
-                    SkillStep {
-                        title: "Pick one next step".to_string(),
-                        instruction: "Offer exactly one tiny next step the user can do in < 2 minutes.".to_string(),
-                        safety_notes: vec!["Keep it optional; avoid pressure.".to_string()],
-                    },
-                ]),
+                steps_override: Some(vec![SkillStep {
+                    title: "Pick one next step".to_string(),
+                    instruction: "Offer exactly one tiny next step the user can do in < 2 minutes."
+                        .to_string(),
+                    safety_notes: vec!["Keep it optional; avoid pressure.".to_string()],
+                }]),
             });
             v.evolution_history.push(SkillEvolutionRecord {
                 ts,
@@ -71,7 +73,8 @@ impl SkillEvolutionSystem {
             // Prepend a warmth step.
             let mut steps = vec![SkillStep {
                 title: "Warm opening".to_string(),
-                instruction: "Lead with a short, validating sentence before the technical steps.".to_string(),
+                instruction: "Lead with a short, validating sentence before the technical steps."
+                    .to_string(),
                 safety_notes: vec!["Keep it sincere; avoid manipulation.".to_string()],
             }];
             steps.extend(v.steps.clone());
@@ -94,4 +97,3 @@ impl SkillEvolutionSystem {
         })
     }
 }
-

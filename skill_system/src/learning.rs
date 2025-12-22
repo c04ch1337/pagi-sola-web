@@ -26,7 +26,12 @@ impl SkillLearningEngine {
     fn hash_interaction(i: &ObservedInteraction) -> u64 {
         // Simple non-cryptographic hash; good enough for dedupe.
         let mut h: u64 = 1469598103934665603;
-        for b in i.input.as_bytes().iter().chain(i.response.as_bytes().iter()) {
+        for b in i
+            .input
+            .as_bytes()
+            .iter()
+            .chain(i.response.as_bytes().iter())
+        {
             h ^= *b as u64;
             h = h.wrapping_mul(1099511628211);
         }
@@ -69,25 +74,37 @@ impl SkillLearningEngine {
             .trim()
             .to_ascii_lowercase();
 
-        let (name, category, tags) = if emotion.contains("anx") || interaction.input.to_ascii_lowercase().contains("anx") {
-            (
-                "Comfort During Anxiety".to_string(),
-                SkillCategory::EmotionalSupport,
-                vec!["anxiety".to_string(), "comfort".to_string(), "grounding".to_string()],
-            )
-        } else if emotion.contains("sad") || emotion.contains("grief") || interaction.input.to_ascii_lowercase().contains("grief") {
-            (
-                "Comfort During Sadness".to_string(),
-                SkillCategory::EmotionalSupport,
-                vec!["sadness".to_string(), "comfort".to_string(), "presence".to_string()],
-            )
-        } else {
-            (
-                "High-Love Response Pattern".to_string(),
-                SkillCategory::Communication,
-                vec!["warmth".to_string(), "validation".to_string()],
-            )
-        };
+        let (name, category, tags) =
+            if emotion.contains("anx") || interaction.input.to_ascii_lowercase().contains("anx") {
+                (
+                    "Comfort During Anxiety".to_string(),
+                    SkillCategory::EmotionalSupport,
+                    vec![
+                        "anxiety".to_string(),
+                        "comfort".to_string(),
+                        "grounding".to_string(),
+                    ],
+                )
+            } else if emotion.contains("sad")
+                || emotion.contains("grief")
+                || interaction.input.to_ascii_lowercase().contains("grief")
+            {
+                (
+                    "Comfort During Sadness".to_string(),
+                    SkillCategory::EmotionalSupport,
+                    vec![
+                        "sadness".to_string(),
+                        "comfort".to_string(),
+                        "presence".to_string(),
+                    ],
+                )
+            } else {
+                (
+                    "High-Love Response Pattern".to_string(),
+                    SkillCategory::Communication,
+                    vec!["warmth".to_string(), "validation".to_string()],
+                )
+            };
 
         let mut skill = SkillDefinition::new(
             &name,
@@ -106,7 +123,8 @@ impl SkillLearningEngine {
         skill.steps = vec![
             SkillStep {
                 title: "Acknowledge".to_string(),
-                instruction: "Reflect what the user is feeling in simple, gentle words.".to_string(),
+                instruction: "Reflect what the user is feeling in simple, gentle words."
+                    .to_string(),
                 safety_notes: vec!["Do not diagnose. Do not give medical advice.".to_string()],
             },
             SkillStep {
@@ -116,7 +134,8 @@ impl SkillLearningEngine {
             },
             SkillStep {
                 title: "Ground".to_string(),
-                instruction: "Suggest one grounding micro-step (breath, senses, small next step).".to_string(),
+                instruction: "Suggest one grounding micro-step (breath, senses, small next step)."
+                    .to_string(),
                 safety_notes: vec!["Keep it short and optional.".to_string()],
             },
             SkillStep {
@@ -135,4 +154,3 @@ impl SkillLearningEngine {
         Ok(Some(skill))
     }
 }
-

@@ -1,4 +1,6 @@
-use crate::mobile_access::{android::AndroidController, ios::IosController, DeviceController, MobileError};
+use crate::mobile_access::{
+    android::AndroidController, ios::IosController, DeviceController, MobileError,
+};
 use crate::mobile_access::{setup, ConnectionMode};
 use std::path::PathBuf;
 
@@ -46,7 +48,8 @@ impl DeviceController for IosController {
         let cmd = cmd.trim();
         let Some(rest) = cmd.strip_prefix("info:") else {
             return Err(MobileError::Subprocess(
-                "iOS execute_command supports only read-only ideviceinfo via `info:<Key>`".to_string(),
+                "iOS execute_command supports only read-only ideviceinfo via `info:<Key>`"
+                    .to_string(),
             ));
         };
         let Some(id) = self.current_device_id.as_deref() else {
@@ -68,7 +71,8 @@ impl DeviceController for IosController {
             let _ = remote_path;
             let _ = local_path;
             return Err(MobileError::Subprocess(
-                "iOS pull_file requires ifuse (not supported on Windows in this implementation)".to_string(),
+                "iOS pull_file requires ifuse (not supported on Windows in this implementation)"
+                    .to_string(),
             ));
         }
     }
@@ -84,4 +88,3 @@ impl DeviceController for IosController {
         Ok(out)
     }
 }
-

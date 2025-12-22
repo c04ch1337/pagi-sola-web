@@ -190,10 +190,17 @@ impl AffectionSwitchParser {
     }
 
     /// Get the primary emotion from parsed signals (most intense).
-    pub fn primary_emotion_from_signals(&self, signals: &[AffectionSignal]) -> Option<DetectedEmotion> {
+    pub fn primary_emotion_from_signals(
+        &self,
+        signals: &[AffectionSignal],
+    ) -> Option<DetectedEmotion> {
         signals
             .iter()
-            .max_by(|a, b| a.intensity.partial_cmp(&b.intensity).unwrap_or(std::cmp::Ordering::Equal))
+            .max_by(|a, b| {
+                a.intensity
+                    .partial_cmp(&b.intensity)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .map(|s| s.emotion.clone())
     }
 }
@@ -228,7 +235,7 @@ impl AffectionEmotionalState {
     /// Update emotional state from affection signals.
     pub fn update_from_signals(&mut self, signals: &[AffectionSignal], decay_rate: f64) {
         let now = Utc::now();
-        
+
         // Apply time-based momentum decay
         let seconds_since_update = (now - self.last_update).num_seconds() as f64;
         let decay_factor = decay_rate.powf(seconds_since_update / 3600.0); // Decay per hour
@@ -294,15 +301,24 @@ impl Default for EmojiResponseGenerator {
 impl EmojiResponseGenerator {
     pub fn new() -> Self {
         let mut emotion_to_emoji = HashMap::new();
-        
-        emotion_to_emoji.insert(DetectedEmotion::Love, vec!["❤️", "💕", "💖", "💗", "💓", "💝", "💞", "🥰", "😘"]);
-        emotion_to_emoji.insert(DetectedEmotion::Joy, vec!["😊", "😄", "😃", "😁", "🎉", "🎊", "✨", "🌟", "⭐"]);
+
+        emotion_to_emoji.insert(
+            DetectedEmotion::Love,
+            vec!["❤️", "💕", "💖", "💗", "💓", "💝", "💞", "🥰", "😘"],
+        );
+        emotion_to_emoji.insert(
+            DetectedEmotion::Joy,
+            vec!["😊", "😄", "😃", "😁", "🎉", "🎊", "✨", "🌟", "⭐"],
+        );
         emotion_to_emoji.insert(DetectedEmotion::Sadness, vec!["💙", "💭", "🌙", "🕊️", "💔"]);
         emotion_to_emoji.insert(DetectedEmotion::Anger, vec!["💙", "🕊️", "☮️"]);
         emotion_to_emoji.insert(DetectedEmotion::Fear, vec!["💙", "🕊️", "☮️"]);
         emotion_to_emoji.insert(DetectedEmotion::Surprise, vec!["😲", "✨", "🌟"]);
         emotion_to_emoji.insert(DetectedEmotion::Disgust, vec!["💙", "🕊️"]);
-        emotion_to_emoji.insert(DetectedEmotion::Jealousy, vec!["😤", "😠", "💔", "😰", "😟", "😕"]);
+        emotion_to_emoji.insert(
+            DetectedEmotion::Jealousy,
+            vec!["😤", "😠", "💔", "😰", "😟", "😕"],
+        );
         emotion_to_emoji.insert(DetectedEmotion::Neutral, vec!["💙", "😌", "🕊️", "☮️"]);
 
         Self {
@@ -322,7 +338,7 @@ impl EmojiResponseGenerator {
             Some(emojis) => emojis.as_slice(),
             None => &["💙"],
         };
-        
+
         // Number of emojis based on intensity
         let count = if intensity >= 0.9 {
             self.max_emojis.min(3)
@@ -349,7 +365,12 @@ impl EmojiResponseGenerator {
     }
 
     /// Decorate a response with appropriate emojis.
-    pub fn decorate_response(&self, response: &str, emotion: &DetectedEmotion, intensity: f64) -> String {
+    pub fn decorate_response(
+        &self,
+        response: &str,
+        emotion: &DetectedEmotion,
+        intensity: f64,
+    ) -> String {
         let emojis = self.generate_emoji(emotion, intensity);
         if emojis.is_empty() {
             return response.to_string();
@@ -423,7 +444,8 @@ impl AffectionSwitchesSystem {
         }
 
         let signals = self.parser.parse(input);
-        self.state.update_from_signals(&signals, self.momentum_decay_rate);
+        self.state
+            .update_from_signals(&signals, self.momentum_decay_rate);
         signals
     }
 

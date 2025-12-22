@@ -38,7 +38,11 @@ impl Orchestrator {
             }
         };
 
-        Self { android, ios, config }
+        Self {
+            android,
+            ios,
+            config,
+        }
     }
 
     fn init_android(cfg: &mut Config) -> Result<AndroidController, MobileError> {
@@ -48,14 +52,16 @@ impl Orchestrator {
     }
 
     fn init_ios(cfg: &Config) -> Result<IosController, MobileError> {
-        let bin_dir = cfg
-            .libimobiledevice_bin_dir
-            .clone()
-            .ok_or_else(|| MobileError::Config("libimobiledevice_bin_dir not configured".to_string()))?;
+        let bin_dir = cfg.libimobiledevice_bin_dir.clone().ok_or_else(|| {
+            MobileError::Config("libimobiledevice_bin_dir not configured".to_string())
+        })?;
         Ok(IosController::new(bin_dir))
     }
 
-    fn pick_first_authorized(devices: Vec<DeviceInfo>, cfg: &Config) -> Result<DeviceInfo, MobileError> {
+    fn pick_first_authorized(
+        devices: Vec<DeviceInfo>,
+        cfg: &Config,
+    ) -> Result<DeviceInfo, MobileError> {
         for d in devices {
             if cfg
                 .authorized_devices
@@ -78,7 +84,9 @@ impl Orchestrator {
             return Err(MobileError::Config("Empty task".to_string()));
         }
 
-        if (task_l.contains("pull") && task_l.contains("photos")) || task_l.contains("backup photos") {
+        if (task_l.contains("pull") && task_l.contains("photos"))
+            || task_l.contains("backup photos")
+        {
             return self.run_backup_photos_android().await;
         }
 
@@ -229,7 +237,10 @@ impl Orchestrator {
         security::ensure_consent(&device.id)?;
         android.connect(&device.id, ConnectionMode::Usb)?;
 
-        let out_path = setup::data_dir()?.join("uiautomator2").join(&device.id).join("dump.txt");
+        let out_path = setup::data_dir()?
+            .join("uiautomator2")
+            .join(&device.id)
+            .join("dump.txt");
         android.uiautomator2_dump_hierarchy(python.as_deref(), &out_path)?;
         Ok(format!("uiautomator2 dump saved to {}", out_path.display()))
     }
@@ -252,4 +263,3 @@ impl Orchestrator {
         Ok(format!("Captured iOS screenshot to {}", path.display()))
     }
 }
-

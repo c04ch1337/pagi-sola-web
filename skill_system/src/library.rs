@@ -26,16 +26,22 @@ impl SkillLibrary {
         let mut lib = Self::default();
         // Best-effort: seed built-ins. Ignore errors to keep initialization infallible.
         let _ = crate::examples::seed_builtin_skills(&mut lib);
-        
+
         // Best-effort: load skills from folder structure
         if let Some(skills_dir) = crate::folder_loader::find_skills_directory() {
-            match crate::folder_loader::load_skills_from_folder(&mut lib, skills_dir.to_str().unwrap_or("skills")) {
+            match crate::folder_loader::load_skills_from_folder(
+                &mut lib,
+                skills_dir.to_str().unwrap_or("skills"),
+            ) {
                 Ok(result) => {
                     if result.loaded > 0 {
                         println!("Loaded {} skills from folder structure", result.loaded);
                     }
                     if result.failed > 0 {
-                        eprintln!("Failed to load {} skills: {:?}", result.failed, result.errors);
+                        eprintln!(
+                            "Failed to load {} skills: {:?}",
+                            result.failed, result.errors
+                        );
                     }
                 }
                 Err(e) => {
@@ -43,7 +49,7 @@ impl SkillLibrary {
                 }
             }
         }
-        
+
         lib
     }
 
@@ -91,7 +97,11 @@ impl SkillLibrary {
             .collect()
     }
 
-    pub fn update_skill_metrics(&mut self, skill_id: &Uuid, result: &SkillResult) -> Result<(), String> {
+    pub fn update_skill_metrics(
+        &mut self,
+        skill_id: &Uuid,
+        result: &SkillResult,
+    ) -> Result<(), String> {
         let Some(skill) = self.get_skill_mut(skill_id) else {
             return Err("skill not found".to_string());
         };
@@ -145,7 +155,9 @@ impl SkillLibrary {
 
         let mut scored = Vec::new();
         for id in candidate_ids {
-            let Some(s) = self.skills.get(&id) else { continue };
+            let Some(s) = self.skills.get(&id) else {
+                continue;
+            };
             let base = 0.35;
             let metric = (s.love_score * 0.55 + s.utility_score * 0.45).clamp(0.0, 1.0);
             let relevance = (base + (metric * 0.65)).clamp(0.0, 1.0);
@@ -165,4 +177,3 @@ impl SkillLibrary {
             .collect()
     }
 }
-

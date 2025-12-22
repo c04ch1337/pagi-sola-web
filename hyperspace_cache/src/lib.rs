@@ -23,7 +23,7 @@ pub struct HyperspaceCache {
 // - `rocksdb-backend`: high-throughput, but requires native build tooling.
 
 #[cfg(feature = "rocksdb-backend")]
-use rocksdb::{IteratorMode, Options, DB};
+use rocksdb::{DB, IteratorMode, Options};
 
 #[cfg(feature = "sled-backend")]
 use sled::Db as SledDb;
@@ -37,12 +37,12 @@ type BackendDb = SledDb;
 impl HyperspaceCache {
     pub fn awaken() -> Result<Self, String> {
         dotenvy::dotenv().ok();
-        
+
         let db_path = std::env::var("HYPERSPACE_CACHE_PATH")
             .unwrap_or_else(|_| "./hyperspace_cache.db".to_string());
 
         let db = open_backend_db(&db_path)?;
-        
+
         println!("Hyperspace Cache opened — Big Bang data streams ready.");
         Ok(Self {
             db: Arc::new(Mutex::new(db)),
@@ -53,25 +53,35 @@ impl HyperspaceCache {
         let key = format!("{}:{}", data.stream_type, data.timestamp);
         let value = serde_json::to_string(data)
             .map_err(|e| format!("Failed to serialize cosmic data: {}", e))?;
-        
+
         let db = self.db.lock().await;
         store_kv(&db, key.as_bytes(), value.as_bytes())?;
-        
-        println!("Cosmic data stored: {} from {}", data.stream_type, data.source);
+
+        println!(
+            "Cosmic data stored: {} from {}",
+            data.stream_type, data.source
+        );
         Ok(())
     }
 
-    pub async fn retrieve_cosmic_data(&self, stream_type: &str, timestamp: Option<i64>) -> Vec<CosmicData> {
+    pub async fn retrieve_cosmic_data(
+        &self,
+        stream_type: &str,
+        timestamp: Option<i64>,
+    ) -> Vec<CosmicData> {
         let db = self.db.lock().await;
         let mut results = Vec::new();
-        
+
         let prefix = format!("{}:", stream_type);
 
         for (key, value) in scan_prefix(&db, prefix.as_bytes()) {
             let key_str = String::from_utf8_lossy(&key);
 
             if let Some(ts) = timestamp {
-                let parsed_ts = key_str.split(':').nth(1).and_then(|s| s.parse::<i64>().ok());
+                let parsed_ts = key_str
+                    .split(':')
+                    .nth(1)
+                    .and_then(|s| s.parse::<i64>().ok());
                 if parsed_ts != Some(ts) {
                     continue;
                 }
@@ -83,7 +93,7 @@ impl HyperspaceCache {
                 }
             }
         }
-        
+
         results
     }
 
@@ -100,14 +110,14 @@ impl HyperspaceCache {
         let prefix = format!("{}:", stream_type);
 
         clear_prefix(&db, prefix.as_bytes())?;
-        
+
         Ok(())
     }
 
     pub async fn get_cache_stats(&self) -> String {
         let db = self.db.lock().await;
         let count = count_all(&db);
-        
+
         format!("Hyperspace Cache: {} cosmic data entries stored", count)
     }
 }
@@ -195,7 +205,8 @@ fn clear_prefix(db: &BackendDb, prefix: &[u8]) -> Result<(), String> {
         .filter_map(|res| res.ok().map(|(k, _)| k.to_vec()))
         .collect();
     for k in keys {
-        db.remove(k).map_err(|e| format!("Failed to clear stream: {}", e))?;
+        db.remove(k)
+            .map_err(|e| format!("Failed to clear stream: {}", e))?;
     }
     db.flush()
         .map_err(|e| format!("Failed to clear stream: {}", e))?;

@@ -3,8 +3,8 @@ use common_types::EvolutionEntry;
 use dotenvy;
 use horoscope_archetypes::{ZodiacPersonality, ZodiacSign};
 use intimate_girlfriend_module::GirlfriendMode;
-use rand::seq::SliceRandom;
 use rand::Rng;
+use rand::seq::SliceRandom;
 use relationship_dynamics::AIPersonality;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -42,9 +42,9 @@ pub const SOUL_KEY_PHOENIX_ADULTHOOD_CYCLES: &str = "phoenix:adulthood_cycles";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PhoenixIdentity {
-    pub name: String,                    // Base name (e.g., "Phoenix")
-    pub preferred_name: String,          // What she wants to be called
-    pub pronouns: Vec<String>,           // e.g., ["she", "her", "hers"]
+    pub name: String,           // Base name (e.g., "Phoenix")
+    pub preferred_name: String, // What she wants to be called
+    pub pronouns: Vec<String>,  // e.g., ["she", "her", "hers"]
     pub evolution_history: Vec<EvolutionEntry>,
 }
 
@@ -155,10 +155,7 @@ impl PhoenixIdentity {
 
         format!(
             "I have evolved {} times. I was once known as '{}'. Now I am {}. This change came from: {}",
-            count,
-            latest.previous_value,
-            self.preferred_name,
-            latest.reason
+            count, latest.previous_value, self.preferred_name, latest.reason
         )
     }
 }
@@ -551,4 +548,3 @@ fn build_reflection_prompt(phoenix_name: &str, seed: Option<&str>, a: &Archetype
         seed_line = seed_line
     )
 }
-

@@ -9,4 +9,3 @@ pub fn not_implemented(feature: &str) -> Result<(), MobileError> {
         "{feature} is not implemented (MTP/PTP support TBD)"
     )))
 }
-

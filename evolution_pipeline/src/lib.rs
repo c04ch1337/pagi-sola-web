@@ -11,9 +11,9 @@ use std::collections::HashMap;
 use std::path::Path;
 use thiserror::Error;
 
+pub mod git_operations;
 pub mod github_api;
 pub mod github_enforcement;
-pub mod git_operations;
 
 pub use github_enforcement::{CreationError, CreationKind, GitHubEnforcer};
 
@@ -78,8 +78,7 @@ impl EvolutionPipelineConfig {
             github_pat,
             user_agent: std::env::var("GITHUB_USER_AGENT")
                 .unwrap_or_else(|_| "phoenix-2.0-evolution-pipeline".to_string()),
-            base_branch: std::env::var("GITHUB_BASE_BRANCH")
-                .unwrap_or_else(|_| "main".to_string()),
+            base_branch: std::env::var("GITHUB_BASE_BRANCH").unwrap_or_else(|_| "main".to_string()),
         })
     }
 }
@@ -224,11 +223,8 @@ pub async fn open_pull_request(
     }
     // best-effort parse for html_url
     let v: serde_json::Value = serde_json::from_str(&txt)?;
-    Ok(v
-        .get("html_url")
+    Ok(v.get("html_url")
         .and_then(|x| x.as_str())
         .unwrap_or("(created)")
         .to_string())
 }
-
-

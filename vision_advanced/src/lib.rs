@@ -140,14 +140,19 @@ fn ensure_default_models_present() -> Result<(), Box<dyn std::error::Error>> {
         {
             ensure_file_downloaded(&fer, &url)?;
         } else {
-            eprintln!("[vision_advanced] models/fer.onnx missing; set PHOENIX_FER_ONNX_URL to auto-download it");
+            eprintln!(
+                "[vision_advanced] models/fer.onnx missing; set PHOENIX_FER_ONNX_URL to auto-download it"
+            );
         }
     }
 
     Ok(())
 }
 
-fn ensure_dlib_landmark_predictor(dat_path: &Path, bz2_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn ensure_dlib_landmark_predictor(
+    dat_path: &Path,
+    bz2_path: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
     if dat_path.exists() {
         return Ok(());
     }
@@ -179,7 +184,11 @@ fn ensure_file_downloaded(path: &Path, url: &str) -> Result<(), Box<dyn std::err
         fs::create_dir_all(parent)?;
     }
 
-    eprintln!("[vision_advanced] downloading {} -> {}", url, path.display());
+    eprintln!(
+        "[vision_advanced] downloading {} -> {}",
+        url,
+        path.display()
+    );
 
     let client = reqwest::blocking::Client::builder()
         .user_agent("phoenix-vision-advanced/0.1")
@@ -205,5 +214,3 @@ fn env_bool(key: &str) -> Option<bool> {
             _ => None,
         })
 }
-
-

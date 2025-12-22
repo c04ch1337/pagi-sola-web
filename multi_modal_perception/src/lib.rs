@@ -50,4 +50,3 @@ impl MultiModalProcessor {
         format!("Multi-modal feeling: {}", feelings.join(" | "))
     }
 }
-

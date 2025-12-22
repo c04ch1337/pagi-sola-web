@@ -1,7 +1,7 @@
 // synaptic_pulse_distributor/src/main.rs
 // Config Update Service (Synaptic Pulse Distributor) — pushes non-binary updates to ORCHs via WebSocket.
 
-use actix_web::{middleware, web, App, Error, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_web::{App, Error, HttpRequest, HttpResponse, HttpServer, Responder, middleware, web};
 use actix_ws::{Message, ProtocolError};
 use futures_util::StreamExt as _;
 use serde::{Deserialize, Serialize};
@@ -22,7 +22,12 @@ fn env_nonempty(key: &str) -> Option<String> {
 
 fn env_truthy(key: &str) -> bool {
     env_nonempty(key)
-        .map(|s| matches!(s.to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "y" | "on"))
+        .map(|s| {
+            matches!(
+                s.to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "y" | "on"
+            )
+        })
         .unwrap_or(false)
 }
 
@@ -184,7 +189,11 @@ async fn publish(
     }
 }
 
-async fn subscribe(req: HttpRequest, body: web::Payload, state: web::Data<AppState>) -> Result<HttpResponse, Error> {
+async fn subscribe(
+    req: HttpRequest,
+    body: web::Payload,
+    state: web::Data<AppState>,
+) -> Result<HttpResponse, Error> {
     let (response, mut session, mut msg_stream) = actix_ws::handle(&req, body)?;
 
     // Each connection gets its own broadcast receiver.
@@ -280,7 +289,10 @@ async fn main() -> std::io::Result<()> {
 
     if env_truthy("PHOENIX_ENV_DEBUG") {
         if let Some(p) = dotenv_path {
-            eprintln!("[synaptic_pulse_distributor] loaded .env from: {}", p.display());
+            eprintln!(
+                "[synaptic_pulse_distributor] loaded .env from: {}",
+                p.display()
+            );
         }
     }
 
@@ -303,4 +315,3 @@ async fn main() -> std::io::Result<()> {
     .run()
     .await
 }
-

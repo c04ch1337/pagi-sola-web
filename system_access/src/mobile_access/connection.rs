@@ -1,9 +1,5 @@
 use crate::mobile_access::{
-    android::AndroidController,
-    ios::IosController,
-    DeviceEvent,
-    DeviceEventKind,
-    DeviceInfo,
+    android::AndroidController, ios::IosController, DeviceEvent, DeviceEventKind, DeviceInfo,
     MobileError,
 };
 use std::collections::HashMap;
@@ -94,4 +90,3 @@ pub fn spawn_android_device_monitor(
 
     rx
 }
-

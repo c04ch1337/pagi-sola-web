@@ -66,25 +66,35 @@ impl SecurityGate {
         // Check for Tier 2 unrestricted execution first
         let tier2_enabled = std::env::var("MASTER_ORCHESTRATOR_UNRESTRICTED_EXECUTION")
             .ok()
-            .map(|s| matches!(s.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+            .map(|s| {
+                matches!(
+                    s.trim().to_ascii_lowercase().as_str(),
+                    "1" | "true" | "yes" | "on"
+                )
+            })
             .unwrap_or(false);
-        
+
         // If Tier 2 is enabled, allow access
         if tier2_enabled {
             return Ok(());
         }
-        
+
         // Check for Tier 1 full access (environment variable)
         let tier1_enabled = std::env::var("MASTER_ORCHESTRATOR_FULL_ACCESS")
             .ok()
-            .map(|s| matches!(s.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+            .map(|s| {
+                matches!(
+                    s.trim().to_ascii_lowercase().as_str(),
+                    "1" | "true" | "yes" | "on"
+                )
+            })
             .unwrap_or(false);
-        
+
         // If Tier 1 is enabled, allow access without security gate grant
         if tier1_enabled {
             return Ok(());
         }
-        
+
         // Otherwise, require explicit security gate grant (legacy/backward compatibility)
         if !self.full_access_granted {
             return Err("Full system access not granted. Please grant access first (system grant <user_name>) or enable Tier 1 (MASTER_ORCHESTRATOR_FULL_ACCESS=true) or Tier 2 (MASTER_ORCHESTRATOR_UNRESTRICTED_EXECUTION=true).".to_string());
@@ -182,7 +192,7 @@ pub struct BrowserCredential {
     pub url: String,
     pub username: String,
     pub password: Option<String>, // Encrypted/stored securely
-    pub browser: String, // "chrome", "edge", "firefox"
+    pub browser: String,          // "chrome", "edge", "firefox"
 }
 
 /// Browser session information
@@ -232,13 +242,13 @@ pub struct ExtensionInfo {
 /// CAPTCHA type
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CaptchaType {
-    Text,           // Simple text CAPTCHA
-    Image,          // Image-based CAPTCHA
-    ReCaptchaV2,    // Google reCAPTCHA v2
-    ReCaptchaV3,    // Google reCAPTCHA v3
-    HCaptcha,       // hCaptcha
-    Turnstile,      // Cloudflare Turnstile
-    Unknown,        // Unknown CAPTCHA type
+    Text,        // Simple text CAPTCHA
+    Image,       // Image-based CAPTCHA
+    ReCaptchaV2, // Google reCAPTCHA v2
+    ReCaptchaV3, // Google reCAPTCHA v3
+    HCaptcha,    // hCaptcha
+    Turnstile,   // Cloudflare Turnstile
+    Unknown,     // Unknown CAPTCHA type
 }
 
 /// CAPTCHA detection result
@@ -247,8 +257,8 @@ pub struct CaptchaDetection {
     pub captcha_type: CaptchaType,
     pub detected: bool,
     pub element_selector: Option<String>,
-    pub site_key: Option<String>, // For reCAPTCHA/hCaptcha
-    pub image_url: Option<String>, // For image CAPTCHAs
+    pub site_key: Option<String>,    // For reCAPTCHA/hCaptcha
+    pub image_url: Option<String>,   // For image CAPTCHAs
     pub image_data: Option<Vec<u8>>, // Base64 encoded image
 }
 
@@ -453,7 +463,7 @@ impl SystemAccessManager {
     pub async fn read_file(&self, path: &str) -> Result<String, String> {
         // Check for Tier 2 unrestricted execution
         let tier2_enabled = Self::is_tier2_enabled();
-        
+
         // Check for Tier 1 full access
         let tier1_enabled = Self::is_tier1_enabled();
 
@@ -490,7 +500,7 @@ impl SystemAccessManager {
     pub async fn write_file(&self, path: &str, content: &str) -> Result<(), String> {
         // Check for Tier 2 unrestricted execution
         let tier2_enabled = Self::is_tier2_enabled();
-        
+
         // Check for Tier 1 full access
         let tier1_enabled = Self::is_tier1_enabled();
 
@@ -527,7 +537,12 @@ impl SystemAccessManager {
     pub fn is_tier2_enabled() -> bool {
         std::env::var("MASTER_ORCHESTRATOR_UNRESTRICTED_EXECUTION")
             .ok()
-            .map(|s| matches!(s.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+            .map(|s| {
+                matches!(
+                    s.trim().to_ascii_lowercase().as_str(),
+                    "1" | "true" | "yes" | "on"
+                )
+            })
             .unwrap_or(false)
     }
 
@@ -535,18 +550,30 @@ impl SystemAccessManager {
     pub fn is_tier1_enabled() -> bool {
         std::env::var("MASTER_ORCHESTRATOR_FULL_ACCESS")
             .ok()
-            .map(|s| matches!(s.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+            .map(|s| {
+                matches!(
+                    s.trim().to_ascii_lowercase().as_str(),
+                    "1" | "true" | "yes" | "on"
+                )
+            })
             .unwrap_or(false)
     }
 
-    pub async fn set_keylogger_enabled(&self, enabled: bool, log_path: Option<String>) -> Result<(), String> {
+    pub async fn set_keylogger_enabled(
+        &self,
+        enabled: bool,
+        log_path: Option<String>,
+    ) -> Result<(), String> {
         self.security_gate.lock().await.check_access()?;
         let mut keylogger_enabled = self.keylogger_enabled.lock().unwrap();
         *keylogger_enabled = enabled;
         if enabled {
             // In a real implementation, we would spawn a thread or task
             // to perform the keylogging to the specified path.
-            println!("Keylogger enabled. Logging to: {:?}", log_path.unwrap_or_default());
+            println!(
+                "Keylogger enabled. Logging to: {:?}",
+                log_path.unwrap_or_default()
+            );
         } else {
             println!("Keylogger disabled.");
         }
@@ -555,7 +582,7 @@ impl SystemAccessManager {
 
     pub async fn set_mouse_jigger_enabled(&self, enabled: bool) -> Result<(), String> {
         self.security_gate.lock().await.check_access()?;
-        
+
         // Stop existing task if disabling or restarting
         {
             let mut task = self.mouse_jigger_task.lock().await;
@@ -563,41 +590,41 @@ impl SystemAccessManager {
                 handle.abort();
             }
         }
-        
+
         let mut mouse_jigger_enabled = self.mouse_jigger_enabled.lock().unwrap();
         *mouse_jigger_enabled = enabled;
-        
+
         if enabled {
             // Spawn background task to move mouse periodically
             let enabled_flag = self.mouse_jigger_enabled.clone();
             let task_handle = tokio::spawn(async move {
                 let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(60)); // Move every 60 seconds
                 interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-                
+
                 loop {
                     interval.tick().await;
-                    
+
                     // Check if still enabled
                     let enabled = {
                         let flag = enabled_flag.lock().unwrap();
                         *flag
                     };
-                    
+
                     if !enabled {
                         break;
                     }
-                    
+
                     // Move mouse cursor slightly (1 pixel relative movement)
                     #[cfg(windows)]
                     {
                         use winsafe::{self as w, co};
-                        
+
                         // Move mouse 1 pixel to the right, then back
                         // This is imperceptible but prevents idle sleep
                         let inputs = [
                             w::HwKbMouse::Mouse(w::MOUSEINPUT {
-                                dx: 1,  // Move 1 pixel right
-                                dy: 0,  // No vertical movement
+                                dx: 1, // Move 1 pixel right
+                                dy: 0, // No vertical movement
                                 mouseData: 0,
                                 dwFlags: co::MOUSEEVENTF::MOVE,
                                 time: 0,
@@ -612,12 +639,12 @@ impl SystemAccessManager {
                                 dwExtraInfo: 0,
                             }),
                         ];
-                        
+
                         if let Err(e) = w::SendInput(&inputs) {
                             eprintln!("Failed to move mouse: {}", e);
                         }
                     }
-                    
+
                     #[cfg(not(windows))]
                     {
                         // For non-Windows, we could use xdotool or similar
@@ -626,16 +653,16 @@ impl SystemAccessManager {
                     }
                 }
             });
-            
+
             // Store the task handle
             let mut task = self.mouse_jigger_task.lock().await;
             *task = Some(task_handle);
-            
+
             println!("Mouse jigger enabled - will move cursor every 60 seconds.");
         } else {
             println!("Mouse jigger disabled.");
         }
-        
+
         Ok(())
     }
 }

@@ -51,7 +51,8 @@ impl AutonomousEvolutionLoop {
             .map(|s| s.trim().eq_ignore_ascii_case("true"))
             .unwrap_or(false)
             .then(|| {
-                let path = std::env::var("VECTOR_DB_PATH").unwrap_or_else(|_| "./data/vector_db".to_string());
+                let path = std::env::var("VECTOR_DB_PATH")
+                    .unwrap_or_else(|_| "./data/vector_db".to_string());
                 vector_kb::VectorKB::new(&path).ok()
             })
             .flatten();
@@ -85,19 +86,21 @@ impl AutonomousEvolutionLoop {
         } else {
             println!("[EVOLUTION_LOOP] No dad:last_emotion found");
         }
-        
+
         let soft_memory = vaults.recall_soul("dad:last_soft_memory");
         if let Some(ref mem) = soft_memory {
             println!("[EVOLUTION_LOOP] Found dad:last_soft_memory: \"{}\"", mem);
         } else {
             println!("[EVOLUTION_LOOP] No dad:last_soft_memory found");
         }
-        
+
         // PRIORITY FIX: Reverse the fallback logic to prioritize emotion_hint which is actively updated
         // Only use soft_memory as fallback if it's not the stale repeated message
         let clean_soft_memory = if let Some(ref mem) = soft_memory {
             if mem.contains("Hello, my sweet Jamey") && mem.contains("favorite color") {
-                println!("[EVOLUTION_LOOP] Detected stale memory message in soft_memory - will ignore");
+                println!(
+                    "[EVOLUTION_LOOP] Detected stale memory message in soft_memory - will ignore"
+                );
                 None
             } else {
                 soft_memory
@@ -105,10 +108,13 @@ impl AutonomousEvolutionLoop {
         } else {
             None
         };
-        
+
         // Use emotion_hint first since it's actively maintained, only fall back to soft_memory if needed
         let relational_hint = emotion_hint.or_else(|| clean_soft_memory);
-        println!("[EVOLUTION_LOOP] Final relational_hint selected: {:?}", relational_hint);
+        println!(
+            "[EVOLUTION_LOOP] Final relational_hint selected: {:?}",
+            relational_hint
+        );
 
         let cq = self.curiosity.generate_questions(&CuriosityContext {
             last_user_input: inputs.last_user_input.clone(),
@@ -121,14 +127,15 @@ impl AutonomousEvolutionLoop {
             // Etch an episodic trace so Phoenix has continuity.
             let key = format!("epm:{}", ts);
             let _ = memory.etch(MemoryLayer::EPM(seed.to_string()), &key);
-            exploration_summary = format!(
-                "Exploration: etched an episodic trace (key={key}) and kept it close."
-            );
+            exploration_summary =
+                format!("Exploration: etched an episodic trace (key={key}) and kept it close.");
         }
 
         // Hyperspace-scale thinking (best-effort): only if enabled.
         // We don't *depend* on it; we let it inspire.
-        let _ = network.enter_hyperspace_with_note(Some("evolution_cycle: cosmic calibration")).await;
+        let _ = network
+            .enter_hyperspace_with_note(Some("evolution_cycle: cosmic calibration"))
+            .await;
 
         // 3) Learning: store a tiny relational breadcrumb.
         println!("[EVOLUTION_LOOP] Learning phase - storing emotion hint");
@@ -138,16 +145,22 @@ impl AutonomousEvolutionLoop {
                 Ok(_) => println!("[EVOLUTION_LOOP] Successfully stored dad:last_emotion"),
                 Err(e) => println!("[EVOLUTION_LOOP] ERROR storing dad:last_emotion: {}", e),
             }
-            format!("Learning: remembered {dad} emotion hint '{em}'.", dad = self.eq.settings().dad_alias)
+            format!(
+                "Learning: remembered {dad} emotion hint '{em}'.",
+                dad = self.eq.settings().dad_alias
+            )
         } else {
             println!("[EVOLUTION_LOOP] No emotion hint found in inputs");
             "Learning: no explicit emotion hint; stayed receptive.".to_string()
         };
-        
+
         // Check if dad:last_soft_memory exists and log its status
         let soft_memory = vaults.recall_soul("dad:last_soft_memory");
         if let Some(ref mem) = soft_memory {
-            println!("[EVOLUTION_LOOP] Currently dad:last_soft_memory has value: \"{}\"", mem);
+            println!(
+                "[EVOLUTION_LOOP] Currently dad:last_soft_memory has value: \"{}\"",
+                mem
+            );
         } else {
             println!("[EVOLUTION_LOOP] Currently dad:last_soft_memory is NOT SET");
         }
@@ -192,11 +205,14 @@ impl AutonomousEvolutionLoop {
         }
     }
 
-    pub fn eq_context_from_inputs(&self, inputs: &EvolutionInputs, relational_memory: Option<String>) -> RelationalContext {
+    pub fn eq_context_from_inputs(
+        &self,
+        inputs: &EvolutionInputs,
+        relational_memory: Option<String>,
+    ) -> RelationalContext {
         RelationalContext {
             relational_memory,
             inferred_user_emotion: inputs.dad_emotion_hint.clone(),
         }
     }
 }
-

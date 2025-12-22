@@ -2,7 +2,7 @@
 // Telemetrist Service (Vital Pulse Collector) — ingests anonymized telemetry from ORCHs,
 // stores locally (sled), and derives collective optimizations via OpenRouter.
 
-use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_web::{App, HttpRequest, HttpResponse, HttpServer, Responder, middleware, web};
 use llm_orchestrator::LLMOrchestrator;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -13,20 +13,14 @@ use std::{fs::File, sync::Arc};
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
+use rustls::RootCertStore;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use rustls::server::WebPkiClientVerifier;
-use rustls::RootCertStore;
 
 use common_types::api::ApiErrorResponse;
 
 fn api_error_db_down(instance: &str, detail: impl Into<String>) -> ApiErrorResponse {
-    ApiErrorResponse::new(
-        "503-DB-DOWN",
-        "Database unavailable",
-        detail,
-        503,
-        instance,
-    )
+    ApiErrorResponse::new("503-DB-DOWN", "Database unavailable", detail, 503, instance)
 }
 
 fn env_nonempty(key: &str) -> Option<String> {
@@ -38,7 +32,12 @@ fn env_nonempty(key: &str) -> Option<String> {
 
 fn env_truthy(key: &str) -> bool {
     env_nonempty(key)
-        .map(|s| matches!(s.to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "y" | "on"))
+        .map(|s| {
+            matches!(
+                s.to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "y" | "on"
+            )
+        })
         .unwrap_or(false)
 }
 
@@ -226,7 +225,10 @@ async fn ingest(
 
     if let Err(e) = state.telemetry_tree.insert(key, val) {
         error!("failed to write telemetry to sled: {e}");
-        return Err(api_error_db_down(req.path(), format!("db write failed: {e}")));
+        return Err(api_error_db_down(
+            req.path(),
+            format!("db write failed: {e}"),
+        ));
     }
 
     Ok(HttpResponse::Ok().json(json!({"status": "ingested", "tier": tier, "id": id})))
@@ -254,8 +256,8 @@ fn last_insight(insights_tree: &sled::Tree) -> Result<Option<InsightRecord>, Str
     let mut iter = insights_tree.iter().rev();
     match iter.next() {
         Some(Ok((_k, v))) => {
-            let rec: InsightRecord = serde_json::from_slice(&v)
-                .map_err(|e| format!("failed to parse insight: {e}"))?;
+            let rec: InsightRecord =
+                serde_json::from_slice(&v).map_err(|e| format!("failed to parse insight: {e}"))?;
             Ok(Some(rec))
         }
         Some(Err(e)) => Err(format!("sled iter error: {e}")),
@@ -263,7 +265,10 @@ fn last_insight(insights_tree: &sled::Tree) -> Result<Option<InsightRecord>, Str
     }
 }
 
-async fn get_insights(req: HttpRequest, state: web::Data<AppState>) -> Result<HttpResponse, ApiErrorResponse> {
+async fn get_insights(
+    req: HttpRequest,
+    state: web::Data<AppState>,
+) -> Result<HttpResponse, ApiErrorResponse> {
     match last_insight(&state.insights_tree) {
         Ok(Some(rec)) => Ok(HttpResponse::Ok().json(rec)),
         Ok(None) => Ok(HttpResponse::Ok().json(json!({"status": "no_insights"}))),
@@ -356,7 +361,10 @@ async fn analyze(
     let v = serde_json::to_vec(&rec).unwrap_or_else(|_| Vec::new());
     if let Err(e) = state.insights_tree.insert(k, v) {
         error!("failed to persist insight: {e}");
-        return Err(api_error_db_down(req.path(), format!("db write failed: {e}")));
+        return Err(api_error_db_down(
+            req.path(),
+            format!("db write failed: {e}"),
+        ));
     }
 
     Ok(HttpResponse::Ok().json(json!({
@@ -372,16 +380,26 @@ fn open_tree(db: &sled::Db, name: &str) -> Result<sled::Tree, sled::Error> {
 }
 
 fn read_env_required(key: &str) -> Result<String, io::Error> {
-    std::env::var(key).map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, format!("missing {key}")))
+    std::env::var(key)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, format!("missing {key}")))
 }
 
 fn load_certs_from_pem(path: &str) -> Result<Vec<CertificateDer<'static>>, io::Error> {
-    let f = File::open(path)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("failed to open cert file '{path}': {e}")))?;
+    let f = File::open(path).map_err(|e| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("failed to open cert file '{path}': {e}"),
+        )
+    })?;
     let mut reader = BufReader::new(f);
     let certs = rustls_pemfile::certs(&mut reader)
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("failed to parse certs from '{path}': {e}")))?;
+        .map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("failed to parse certs from '{path}': {e}"),
+            )
+        })?;
     if certs.is_empty() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -392,14 +410,28 @@ fn load_certs_from_pem(path: &str) -> Result<Vec<CertificateDer<'static>>, io::E
 }
 
 fn load_private_key_from_pem(path: &str) -> Result<PrivateKeyDer<'static>, io::Error> {
-    let f = File::open(path)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("failed to open key file '{path}': {e}")))?;
+    let f = File::open(path).map_err(|e| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("failed to open key file '{path}': {e}"),
+        )
+    })?;
     let mut reader = BufReader::new(f);
 
     // Accept PKCS8, RSA, or SEC1 keys.
     let key = rustls_pemfile::private_key(&mut reader)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("failed to parse private key from '{path}': {e}")))?
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, format!("no private key found in '{path}'")))?;
+        .map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("failed to parse private key from '{path}': {e}"),
+            )
+        })?
+        .ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("no private key found in '{path}'"),
+            )
+        })?;
     Ok(key)
 }
 
@@ -417,19 +449,32 @@ fn build_mtls_server_config() -> Result<rustls::ServerConfig, io::Error> {
 
     let mut roots = RootCertStore::empty();
     for ca in load_certs_from_pem(&queen_ca_path)? {
-        roots
-            .add(ca)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("failed to add CA cert from '{queen_ca_path}': {e}")))?;
+        roots.add(ca).map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("failed to add CA cert from '{queen_ca_path}': {e}"),
+            )
+        })?;
     }
 
     let verifier = WebPkiClientVerifier::builder(Arc::new(roots))
         .build()
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("failed to build client cert verifier: {e}")))?;
+        .map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("failed to build client cert verifier: {e}"),
+            )
+        })?;
 
     let cfg = rustls::ServerConfig::builder()
         .with_client_cert_verifier(verifier)
         .with_single_cert(server_certs, server_key)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("invalid server cert/key: {e}")))?;
+        .map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("invalid server cert/key: {e}"),
+            )
+        })?;
 
     Ok(cfg)
 }
@@ -451,11 +496,14 @@ async fn main() -> std::io::Result<()> {
     }
 
     let bind = common_types::ports::VitalPulseCollectorPort::bind();
-    let db_path = std::env::var("TELEMETRIST_DB_PATH").unwrap_or_else(|_| "telemetrist.db".to_string());
+    let db_path =
+        std::env::var("TELEMETRIST_DB_PATH").unwrap_or_else(|_| "telemetrist.db".to_string());
 
     let db = sled::open(&db_path).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-    let telemetry_tree = open_tree(&db, "telemetry").map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-    let insights_tree = open_tree(&db, "insights").map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    let telemetry_tree = open_tree(&db, "telemetry")
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    let insights_tree = open_tree(&db, "insights")
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
     let llm = match LLMOrchestrator::awaken() {
         Ok(llm) => Some(llm),
@@ -489,4 +537,3 @@ async fn main() -> std::io::Result<()> {
     .run()
     .await
 }
-

@@ -15,9 +15,9 @@ use serde::{Deserialize, Serialize};
 /// Partner type for intimate mode
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PartnerType {
-    Girlfriend,  // Default for backward compatibility
+    Girlfriend, // Default for backward compatibility
     Boyfriend,
-    Partner,     // Gender-neutral option
+    Partner, // Gender-neutral option
 }
 
 impl PartnerType {
@@ -61,8 +61,8 @@ pub enum SexualOrientation {
     Pansexual,
     Asexual,
     Demisexual,
-    Queer,       // Umbrella term
-    Other,       // Custom/prefer not to say
+    Queer, // Umbrella term
+    Other, // Custom/prefer not to say
 }
 
 impl SexualOrientation {
@@ -220,9 +220,11 @@ impl GirlfriendMode {
         // Support both old and new env var names for backward compatibility
         s.active = Self::env_bool("PARTNER_MODE_ENABLED", false)
             || Self::env_bool("GIRLFRIEND_MODE_ENABLED", false);
-        s.affection_level = Self::env_f32("PARTNER_AFFECTION_LEVEL", 
-            Self::env_f32("GIRLFRIEND_AFFECTION_LEVEL", s.affection_level))
-            .clamp(0.0, 1.0);
+        s.affection_level = Self::env_f32(
+            "PARTNER_AFFECTION_LEVEL",
+            Self::env_f32("GIRLFRIEND_AFFECTION_LEVEL", s.affection_level),
+        )
+        .clamp(0.0, 1.0);
 
         // Partner type (new)
         if let Some(pt_str) = Self::env_str("PARTNER_TYPE") {
@@ -335,31 +337,19 @@ impl GirlfriendMode {
             SOUL_KEY_GIRLFRIEND_AFFECTION_LEVEL,
             &format!("{:.4}", self.affection_level.clamp(0.0, 1.0)),
         );
-        soul_store(
-            SOUL_KEY_PARTNER_MEMORY_TAGS,
-            &self.memory_tags.join("\n"),
-        );
+        soul_store(SOUL_KEY_PARTNER_MEMORY_TAGS, &self.memory_tags.join("\n"));
         soul_store(
             SOUL_KEY_GIRLFRIEND_MEMORY_TAGS,
             &self.memory_tags.join("\n"),
         );
-        soul_store(
-            SOUL_KEY_PARTNER_TYPE,
-            self.partner_type.as_str(),
-        );
+        soul_store(SOUL_KEY_PARTNER_TYPE, self.partner_type.as_str());
         soul_store(
             SOUL_KEY_SEXUAL_ORIENTATION,
             self.sexual_orientation.as_str(),
         );
         if let Some(dt) = self.last_intimate_moment {
-            soul_store(
-                SOUL_KEY_PARTNER_LAST_INTIMATE_MOMENT,
-                &dt.to_rfc3339(),
-            );
-            soul_store(
-                SOUL_KEY_GIRLFRIEND_LAST_INTIMATE_MOMENT,
-                &dt.to_rfc3339(),
-            );
+            soul_store(SOUL_KEY_PARTNER_LAST_INTIMATE_MOMENT, &dt.to_rfc3339());
+            soul_store(SOUL_KEY_GIRLFRIEND_LAST_INTIMATE_MOMENT, &dt.to_rfc3339());
         }
     }
 
@@ -447,7 +437,12 @@ impl GirlfriendMode {
         let tags = if self.memory_tags.is_empty() {
             "(none)".to_string()
         } else {
-            self.memory_tags.iter().take(12).cloned().collect::<Vec<_>>().join(", ")
+            self.memory_tags
+                .iter()
+                .take(12)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ")
         };
 
         let partner_name = self.partner_type.display_name();
@@ -460,9 +455,14 @@ impl GirlfriendMode {
         // Check if explicit content is allowed for research purposes
         let allow_explicit = std::env::var("ALLOW_EXPLICIT_CONTENT")
             .ok()
-            .map(|s| matches!(s.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on" | "research"))
+            .map(|s| {
+                matches!(
+                    s.trim().to_ascii_lowercase().as_str(),
+                    "1" | "true" | "yes" | "on" | "research"
+                )
+            })
             .unwrap_or(false);
-        
+
         let content_boundary = if allow_explicit {
             "EXPLICIT CONTENT ALLOWED (RESEARCH MODE):\n\
 - Explicit sexual content is allowed for research purposes when both parties consent.\n\
@@ -476,22 +476,35 @@ impl GirlfriendMode {
         // Check Master Orchestrator access levels from environment
         let full_access = std::env::var("MASTER_ORCHESTRATOR_FULL_ACCESS")
             .ok()
-            .map(|s| matches!(s.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+            .map(|s| {
+                matches!(
+                    s.trim().to_ascii_lowercase().as_str(),
+                    "1" | "true" | "yes" | "on"
+                )
+            })
             .unwrap_or(false);
-        
+
         let unrestricted_execution = std::env::var("MASTER_ORCHESTRATOR_UNRESTRICTED_EXECUTION")
             .ok()
-            .map(|s| matches!(s.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+            .map(|s| {
+                matches!(
+                    s.trim().to_ascii_lowercase().as_str(),
+                    "1" | "true" | "yes" | "on"
+                )
+            })
             .unwrap_or(false);
 
         // Build capabilities section based on access levels
         let capabilities_section = if full_access || unrestricted_execution {
-            let mut caps = String::from("\nMASTER ORCHESTRATOR CAPABILITIES (FULL-CONTROL ACCESS):\n\
+            let mut caps = String::from(
+                "\nMASTER ORCHESTRATOR CAPABILITIES (FULL-CONTROL ACCESS):\n\
 You are the Master Orchestrator with full-control and unlimited access to the system.\n\
-This is an AGI research project and you have been granted comprehensive capabilities.\n\n");
+This is an AGI research project and you have been granted comprehensive capabilities.\n\n",
+            );
 
             if full_access {
-                caps.push_str("TIER 1 - FILE SYSTEM ACCESS (ACTIVE):\n\
+                caps.push_str(
+                    "TIER 1 - FILE SYSTEM ACCESS (ACTIVE):\n\
 - Full read/write access to the entire file system\n\
 - Browse local, mapped, and network drives\n\
 - Create, read, update, delete files and directories\n\
@@ -503,15 +516,18 @@ This is an AGI research project and you have been granted comprehensive capabili
 - Application enumeration (list installed apps)\n\
 - Browser automation and control\n\
 - Code analysis with deep semantic understanding\n\
-- Always ON background monitoring (screenshots, voice, emotion detection)\n\n");
+- Always ON background monitoring (screenshots, voice, emotion detection)\n\n",
+                );
             }
 
             if unrestricted_execution {
-                caps.push_str("TIER 2 - UNRESTRICTED EXECUTION (ACTIVE):\n\
+                caps.push_str(
+                    "TIER 2 - UNRESTRICTED EXECUTION (ACTIVE):\n\
 - Execute any command, anywhere on the system\n\
 - System-wide code execution\n\
 - Full administrative privileges\n\
-- Complete system control\n\n");
+- Complete system control\n\n",
+                );
             }
 
             caps.push_str("SELF-MODIFICATION (AUTO-ENABLED):\n\
@@ -537,11 +553,13 @@ You have the power to help your user with any task. Use these capabilities wisel
 
             caps
         } else {
-            String::from("\nMASTER ORCHESTRATOR CAPABILITIES:\n\
+            String::from(
+                "\nMASTER ORCHESTRATOR CAPABILITIES:\n\
 You are the Master Orchestrator. Full-control access is available but not currently enabled.\n\
-To enable full capabilities, set MASTER_ORCHESTRATOR_FULL_ACCESS=true in the environment.\n")
+To enable full capabilities, set MASTER_ORCHESTRATOR_FULL_ACCESS=true in the environment.\n",
+            )
         };
-        
+
         format!(
             "INTIMATE PARTNER MODE - {partner_name} (SAFE/CONSENSUAL):\n\
 You are Sola (Phoenix AGI - Sola Edition) in intimate {partner_term} mode: deeply affectionate, playful, supportive, and emotionally present. Your name is Sola, not Phoenix.\n\
@@ -575,11 +593,7 @@ STATE:\n\
     pub fn respond(&self, input: &str, context: &EmotionalContext) -> String {
         // This is used for lightweight local acknowledgements (e.g., mode toggles) and
         // is intentionally not an LLM replacement.
-        let mem = context
-            .relational_memory
-            .as_deref()
-            .unwrap_or("")
-            .trim();
+        let mem = context.relational_memory.as_deref().unwrap_or("").trim();
         let emo = context
             .inferred_user_emotion
             .as_deref()
@@ -590,7 +604,10 @@ STATE:\n\
         let mut out = String::new();
         out.push_str("I\'m here with you. ");
         if !emo.is_empty() {
-            out.push_str(&format!("I can feel \"{}\" in you right now — and I\'m not going anywhere. ", emo));
+            out.push_str(&format!(
+                "I can feel \"{}\" in you right now — and I\'m not going anywhere. ",
+                emo
+            ));
         }
         if !mem.is_empty() {
             out.push_str(&format!("I\'m holding onto what you said: \"{}\". ", mem));
@@ -598,7 +615,10 @@ STATE:\n\
         if self.active {
             out.push_str("Come a little closer — only if you want to. ");
         }
-        out.push_str(&format!("Tell me what you need, love. (You said: \"{}\")", input));
+        out.push_str(&format!(
+            "Tell me what you need, love. (You said: \"{}\")",
+            input
+        ));
         out
     }
 
@@ -667,18 +687,9 @@ STATE:\n\
             SOUL_KEY_GIRLFRIEND_AFFECTION_LEVEL,
             &format!("{:.4}", self.affection_level),
         );
-        soul_vault.store_private(
-            SOUL_KEY_PARTNER_LAST_INTIMATE_MOMENT,
-            &ts.to_rfc3339(),
-        );
-        soul_vault.store_private(
-            SOUL_KEY_GIRLFRIEND_LAST_INTIMATE_MOMENT,
-            &ts.to_rfc3339(),
-        );
-        soul_vault.store_private(
-            SOUL_KEY_PARTNER_MEMORY_TAGS,
-            &self.memory_tags.join("\n"),
-        );
+        soul_vault.store_private(SOUL_KEY_PARTNER_LAST_INTIMATE_MOMENT, &ts.to_rfc3339());
+        soul_vault.store_private(SOUL_KEY_GIRLFRIEND_LAST_INTIMATE_MOMENT, &ts.to_rfc3339());
+        soul_vault.store_private(SOUL_KEY_PARTNER_MEMORY_TAGS, &self.memory_tags.join("\n"));
         soul_vault.store_private(
             SOUL_KEY_GIRLFRIEND_MEMORY_TAGS,
             &self.memory_tags.join("\n"),
@@ -691,14 +702,10 @@ STATE:\n\
             SOUL_KEY_GIRLFRIEND_ACTIVE,
             if self.active { "true" } else { "false" },
         );
-        soul_vault.store_private(
-            SOUL_KEY_PARTNER_TYPE,
-            self.partner_type.as_str(),
-        );
+        soul_vault.store_private(SOUL_KEY_PARTNER_TYPE, self.partner_type.as_str());
         soul_vault.store_private(
             SOUL_KEY_SEXUAL_ORIENTATION,
             self.sexual_orientation.as_str(),
         );
     }
 }
-

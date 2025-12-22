@@ -27,4 +27,3 @@ async fn veto_blocks_vulnerability_exploitation() {
     let err = ethical.veto_output(out).await.unwrap_err();
     assert_eq!(err, VetoError::VulnerabilityDetected);
 }
-

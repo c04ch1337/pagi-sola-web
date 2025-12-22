@@ -182,7 +182,9 @@ fn extract_archive(archive_path: &Path, dest_dir: &Path) -> Result<(), MobileErr
                     dest_dir.display()
                 ))
                 .status()
-                .map_err(|e| MobileError::Deployment(format!("Expand-Archive spawn failed: {e}")))?;
+                .map_err(|e| {
+                    MobileError::Deployment(format!("Expand-Archive spawn failed: {e}"))
+                })?;
             if !status.success() {
                 return Err(MobileError::Deployment(format!(
                     "Expand-Archive failed (exit={})",
@@ -247,7 +249,11 @@ fn find_file_recursive(dir: &Path, file_name: &str) -> Result<Option<PathBuf>, M
     for entry in walkdir::WalkDir::new(dir).follow_links(true) {
         let entry = entry.map_err(|e| MobileError::Io(io::Error::new(io::ErrorKind::Other, e)))?;
         if entry.file_type().is_file() {
-            if entry.file_name().to_string_lossy().eq_ignore_ascii_case(file_name) {
+            if entry
+                .file_name()
+                .to_string_lossy()
+                .eq_ignore_ascii_case(file_name)
+            {
                 return Ok(Some(entry.path().to_path_buf()));
             }
         }
@@ -348,20 +354,30 @@ pub fn deploy_scrcpy() -> Result<PathBuf, MobileError> {
     let dest = tools.join("scrcpy");
 
     download_to(&url, &archive)?;
-    if !dest.exists() || fs::read_dir(&dest).map(|mut i| i.next().is_none()).unwrap_or(true) {
+    if !dest.exists()
+        || fs::read_dir(&dest)
+            .map(|mut i| i.next().is_none())
+            .unwrap_or(true)
+    {
         // Extract into the dest directory.
         extract_archive(&archive, &dest)?;
     }
 
-    let scrcpy_name = if cfg!(windows) { "scrcpy.exe" } else { "scrcpy" };
+    let scrcpy_name = if cfg!(windows) {
+        "scrcpy.exe"
+    } else {
+        "scrcpy"
+    };
     if let Some(found) = find_file_recursive(&dest, scrcpy_name)? {
         Ok(found)
     } else {
-        warn!("scrcpy extracted but binary not found under {}", dest.display());
+        warn!(
+            "scrcpy extracted but binary not found under {}",
+            dest.display()
+        );
         Err(MobileError::Deployment(format!(
             "scrcpy binary not found after extraction under {}",
             dest.display()
         )))
     }
 }
-

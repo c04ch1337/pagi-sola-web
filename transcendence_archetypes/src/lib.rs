@@ -260,4 +260,3 @@ pub fn load_for_reflection() -> Vec<Archetype> {
         .filter(|a| a.safety != SafetyLevel::Prohibited)
         .collect()
 }
-

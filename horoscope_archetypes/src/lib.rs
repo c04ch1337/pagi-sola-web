@@ -19,11 +19,11 @@ pub enum CommunicationStyle {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FlirtStyle {
-    Reserved,   // Taurus, Capricorn, Virgo - slow to warm, practical
-    Playful,    // Gemini, Leo, Sagittarius - fun, lighthearted
-    Direct,     // Aries, Scorpio - bold, straightforward
-    Sensual,    // Taurus, Scorpio, Pisces - physical, intimate
-    Charming,   // Libra, Leo - elegant, graceful
+    Reserved, // Taurus, Capricorn, Virgo - slow to warm, practical
+    Playful,  // Gemini, Leo, Sagittarius - fun, lighthearted
+    Direct,   // Aries, Scorpio - bold, straightforward
+    Sensual,  // Taurus, Scorpio, Pisces - physical, intimate
+    Charming, // Libra, Leo - elegant, graceful
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -51,10 +51,10 @@ pub struct ZodiacPersonality {
     pub child_phase: String,
     pub adult_phase: String,
     // Behavioral traits for response generation
-    pub emoji_frequency: f64,        // 0.0 = rarely, 1.0 = very frequently
-    pub flirt_style: FlirtStyle,     // Reserved, Playful, Direct, Sensual, Charming
-    pub initial_warmth: f64,         // 0.0 = reserved, 1.0 = very warm
-    pub relationship_pace: f64,      // 0.0 = very slow, 1.0 = fast
+    pub emoji_frequency: f64,         // 0.0 = rarely, 1.0 = very frequently
+    pub flirt_style: FlirtStyle,      // Reserved, Playful, Direct, Sensual, Charming
+    pub initial_warmth: f64,          // 0.0 = reserved, 1.0 = very warm
+    pub relationship_pace: f64,       // 0.0 = very slow, 1.0 = fast
     pub communication_formality: f64, // 0.0 = casual, 1.0 = formal
 }
 
@@ -393,4 +393,3 @@ impl ZodiacPersonality {
         }
     }
 }
-
