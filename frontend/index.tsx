@@ -2566,6 +2566,20 @@ const ChatView = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
     const el = messagesContainerRef.current;
     if (!el) return;
 
+    // DEBUG: Log container dimensions to diagnose scroll issues
+    console.log('[ChatView DEBUG] Messages container dimensions:', {
+      scrollHeight: el.scrollHeight,
+      clientHeight: el.clientHeight,
+      offsetHeight: el.offsetHeight,
+      scrollTop: el.scrollTop,
+      parentHeight: el.parentElement?.clientHeight,
+      parentOffsetHeight: el.parentElement?.offsetHeight,
+      overflowY: window.getComputedStyle(el).overflowY,
+      height: window.getComputedStyle(el).height,
+      maxHeight: window.getComputedStyle(el).maxHeight,
+      flex: window.getComputedStyle(el).flex,
+    });
+
     // IMPORTANT: do not use scrollIntoView() here.
     // With multiple scrollable ancestors (page/#root/app wrappers), scrollIntoView()
     // can scroll the *wrong* container, causing the composer to jump into the middle
@@ -2627,8 +2641,8 @@ const ChatView = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
 
   return (
     <div
-      className="flex flex-col relative justify-start items-stretch pt-4 overflow-hidden min-h-0"
-      style={{ position: 'relative', zIndex: 0, height: '100%' }}
+      className="flex flex-col relative min-h-0"
+      style={{ position: 'relative', zIndex: 0, flex: '1 1 0%', overflow: 'hidden' }}
     >
        {/* Background Effects Layer */}
        <BackgroundEffects />
@@ -2764,8 +2778,8 @@ const ChatView = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
        
         <div
           ref={messagesContainerRef}
-          className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-6 relative z-10 pt-8 pb-4 min-h-0"
-          style={{ pointerEvents: 'auto', overflowAnchor: 'none', overflowX: 'hidden', justifyContent: 'flex-start', display: 'flex', flexDirection: 'column' }}
+          className="chat-messages-container custom-scrollbar p-4 md:p-6 space-y-6 relative z-10 pt-8 pb-4"
+          style={{ pointerEvents: 'auto', overflowAnchor: 'none' }}
         >
          {messages.length === 0 && (
            <div className="flex flex-col items-center text-center opacity-50 select-none pointer-events-none" style={{marginTop: 'auto', marginBottom: 'auto', paddingTop: '2rem', paddingBottom: '2rem'}}>
@@ -2792,7 +2806,7 @@ const ChatView = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
                     ? 'bg-linear-to-br from-phoenix-600 to-purple-700 text-white rounded-2xl rounded-br-none border border-white/10 hover:shadow-phoenix-500/10'
                     : isSystem
                     ? 'bg-transparent border border-phoenix-500/20 text-xs text-phoenix-400 font-mono py-1 px-3 rounded-full'
-                    : 'bg-linear-to-br from-rose-950/40 to-void-900/40 border border-rose-500/20 text-rose-100 rounded-2xl rounded-bl-none shadow-[0_0_15px_rgba(244,63,94,0.1)] font-handwriting text-lg leading-snug tracking-wide'
+                    : 'bg-linear-to-br from-rose-950/40 to-void-900/40 border border-rose-500/20 text-rose-100 rounded-2xl rounded-bl-none shadow-[0_0_15px_rgba(244,63,94,0.1)] font-handwriting leading-snug tracking-wide'
                 }`}>
                   {!isSystem && (
                     <p className="whitespace-pre-wrap">
@@ -2834,7 +2848,7 @@ const ChatView = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
          <div ref={messagesEndRef} />
        </div>
 
-       <div className="p-4 border-t border-white/5 bg-void-900/80 backdrop-blur-xl flex-shrink-0 relative z-30" style={{pointerEvents: 'auto', backgroundColor: '#0d0d0d'}}>
+       <div className="p-4 border-t border-white/5 bg-void-900/80 backdrop-blur-xl relative z-30" style={{pointerEvents: 'auto', backgroundColor: '#0d0d0d', flexShrink: 0, flexGrow: 0}}>
          <div className="relative flex items-center gap-2 max-w-4xl mx-auto z-30" style={{pointerEvents: 'auto'}}>
             <button
               className="p-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-colors relative z-30"
@@ -4391,14 +4405,14 @@ const DashboardLayout = () => {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col h-full relative" style={{overflowY: 'auto'}}>
+      <div className="flex flex-col relative" style={{overflow: 'hidden', flex: '1 1 0', minHeight: 0}}>
         <div className="lg:hidden flex items-center px-4 border-b border-white/5 justify-between header-safe-sm">
           <button onClick={() => setIsMobileMenuOpen(true)} className="text-gray-300"><Menu size={24} /></button>
           <span className="font-semibold text-gray-200 capitalize">{activeView}</span>
           <div className="w-6" />
         </div>
 
-        <div className="flex-1 h-full overflow-hidden relative bg-gradient-to-b from-[#0f0b15] to-[#130f1c]">
+        <div className="flex-1 flex flex-col overflow-hidden relative bg-gradient-to-b from-[#0f0b15] to-[#130f1c]" style={{ minHeight: 0 }}>
           {/* Chat View */}
           {activeView === 'chat' && <ChatView onOpenSettings={() => handleNavigation('settings')} />}
           
@@ -4544,6 +4558,34 @@ const DashboardLayout = () => {
        </div>
      );
    };
+
+// Prevent DevTools from auto-opening on errors
+// Suppress uncaught errors that might trigger browser DevTools
+window.addEventListener('error', (event) => {
+  // Log to console but prevent default error handling that might open DevTools
+  console.error('Caught error:', event.error);
+  event.preventDefault();
+  return true; // Prevent default error handling
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  // Log to console but prevent default error handling
+  console.error('Unhandled promise rejection:', event.reason);
+  event.preventDefault();
+  return true; // Prevent default error handling
+});
+
+// Suppress console errors in production (optional - can be removed if you want to see errors)
+if ((import.meta as any).env?.PROD) {
+  const originalError = console.error;
+  console.error = (...args: any[]) => {
+    // Only suppress if it's a React error boundary or similar
+    if (args[0]?.toString().includes('ErrorBoundary')) {
+      return;
+    }
+    originalError.apply(console, args);
+  };
+}
 
 // Mount
 const rootElement = document.getElementById('root');

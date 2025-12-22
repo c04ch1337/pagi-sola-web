@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => {
     const apiBase = 'http://127.0.0.1:5000'; // Backend API port
     return {
       server: {
-        port: 8888, // Hardcoded to use port 8888
+        port: 8888, // Frontend dev server port
         host: '0.0.0.0',
         proxy: {
           // Local dev:
