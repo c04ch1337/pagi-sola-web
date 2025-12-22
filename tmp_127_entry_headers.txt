@@ -1,0 +1,10 @@
+HTTP/1.1 200 OK
+Vary: Origin
+Content-Type: text/javascript
+Cache-Control: no-cache
+Etag: W/"53be2-yUg2k7JeeP6RkktgKfIWCAqXjeA"
+Date: Mon, 22 Dec 2025 12:48:18 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+Content-Length: 752853
+

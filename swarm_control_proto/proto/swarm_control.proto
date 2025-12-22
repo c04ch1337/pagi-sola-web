@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package swarm_control;
+
+// Commands are sent by the Hub/QUEEN to the Agent.
+//
+// Security contract:
+// - `signed_payload` contains the sensitive command bytes (format is app-defined).
+// - `signature` is the Ed25519 signature over `signed_payload` created by the QUEEN.
+message Command {
+  string id = 1;
+  bytes signed_payload = 2;
+  bytes signature = 3;
+}
+
+// Status updates are sent by the Agent to the Hub.
+message StatusUpdate {
+  string agent_id = 1;
+  int64 heartbeat_timestamp = 2;
+  int32 current_status_code = 3;
+}
+
+// Bidirectional control envelope.
+message ControlMessage {
+  oneof message {
+    Command command = 1;
+    StatusUpdate status_update = 2;
+  }
+}
+
+service SwarmControl {
+  rpc StreamControl(stream ControlMessage) returns (stream ControlMessage);
+}
+
