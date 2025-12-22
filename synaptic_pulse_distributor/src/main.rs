@@ -11,6 +11,8 @@ use tokio::sync::broadcast;
 use tracing::{error, info};
 use uuid::Uuid;
 
+use common_types::api::ApiErrorResponse;
+
 fn env_nonempty(key: &str) -> Option<String> {
     std::env::var(key)
         .ok()
@@ -136,13 +138,20 @@ struct PublishRequest {
     payload: serde_json::Value,
 }
 
-async fn publish(req: HttpRequest, state: web::Data<AppState>, body: web::Json<PublishRequest>) -> impl Responder {
+async fn publish(
+    req: HttpRequest,
+    state: web::Data<AppState>,
+    body: web::Json<PublishRequest>,
+) -> Result<HttpResponse, ApiErrorResponse> {
     let caller_tier = tier_from_x402(&req);
     if body.tier_required == "premium" && caller_tier != "premium" {
-        return HttpResponse::PaymentRequired().json(json!({
-            "error": "premium tier required",
-            "required": "premium",
-        }));
+        return Err(ApiErrorResponse::new(
+            "402-PREMIUM-REQUIRED",
+            "Premium tier required",
+            "request requires premium tier (X402 header missing/invalid)",
+            402,
+            req.path(),
+        ));
     }
 
     let env = UpdateEnvelope {
@@ -157,10 +166,20 @@ async fn publish(req: HttpRequest, state: web::Data<AppState>, body: web::Json<P
     };
 
     match state.tx.send(env.clone()) {
-        Ok(fanout) => HttpResponse::Ok().json(json!({"status": "published", "fanout": fanout, "update": env})),
+        Ok(fanout) => Ok(HttpResponse::Ok().json(json!({
+            "status": "published",
+            "fanout": fanout,
+            "update": env
+        }))),
         Err(e) => {
             error!("publish failed: {e}");
-            HttpResponse::InternalServerError().json(json!({"error": "publish failed"}))
+            Err(ApiErrorResponse::new(
+                "503-BROADCAST-DOWN",
+                "Distributor broadcast unavailable",
+                format!("broadcast send failed: {e}"),
+                503,
+                req.path(),
+            ))
         }
     }
 }

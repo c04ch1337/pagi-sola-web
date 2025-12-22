@@ -2,16 +2,70 @@ import './styles.css';
 import React, { useState, useEffect, useRef, useMemo, useCallback, createContext, useContext } from 'react';
 import { createRoot } from 'react-dom/client';
 
+// --- Hostname helpers (single source of truth) ---
+// IP-compat mode is intended for non-loopback IP hosts only.
+// Loopback hosts (127.0.0.1, ::1, localhost) should behave like localhost.
+function normalizeHostname(hostname: string) {
+  return (hostname || '').trim().toLowerCase();
+}
+
+function isIpv4Host(hostname: string) {
+  const h = normalizeHostname(hostname);
+  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!m) return false;
+  const nums = m.slice(1).map((n) => Number(n));
+  return nums.every((n) => Number.isInteger(n) && n >= 0 && n <= 255);
+}
+
+function isIpv6Host(hostname: string) {
+  const h = normalizeHostname(hostname);
+  // Keep this permissive: we only use it for UI compatibility toggling.
+  // A hostname with ':' and only hex/colon chars is treated as IPv6.
+  return h.includes(':') && /^[0-9a-f:]+$/.test(h);
+}
+
+function isLoopbackHost(hostname: string) {
+  const h = normalizeHostname(hostname);
+  if (h === 'localhost') return true;
+  if (h === '::1' || h === '0:0:0:0:0:0:0:1') return true;
+
+  // IPv4 loopback block (127.0.0.0/8)
+  if (isIpv4Host(h)) {
+    const firstOctet = Number(h.split('.')[0]);
+    return firstOctet === 127;
+  }
+
+  // IPv6-mapped IPv4 loopback, e.g. ::ffff:127.0.0.1
+  if (h.startsWith('::ffff:')) {
+    const mapped = h.slice('::ffff:'.length);
+    if (isIpv4Host(mapped)) {
+      const firstOctet = Number(mapped.split('.')[0]);
+      return firstOctet === 127;
+    }
+  }
+
+  return false;
+}
+
+function isIpHost(hostname: string) {
+  return isIpv4Host(hostname) || isIpv6Host(hostname);
+}
+
+function shouldEnableIpCompatMode(hostname: string) {
+  return isIpHost(hostname) && !isLoopbackHost(hostname);
+}
+
+function setIpCompatModeEnabled(enabled: boolean) {
+  if (enabled) document.documentElement.setAttribute('data-host-is-ip', 'true');
+  else document.documentElement.removeAttribute('data-host-is-ip');
+}
+
 // Enhanced detection of IP address access
 const detectIpAccess = () => {
-  // IP v4 pattern - matches standard and non-standard IP forms
-  const isIpAddress =
-    /^(\d{1,3}\.){3}\d{1,3}$/.test(window.location.hostname) ||
-    window.location.hostname === '127.0.0.1';
-  
-  if (isIpAddress) {
-    document.documentElement.setAttribute('data-host-is-ip', 'true');
-    console.log('Phoenix UI: IP address access detected, applying compatibility fixes');
+  const enabled = shouldEnableIpCompatMode(window.location.hostname);
+  setIpCompatModeEnabled(enabled);
+  if (enabled) {
+    console.log('Phoenix UI: non-loopback IP host detected, applying IP compatibility mode');
   }
 };
 
@@ -24,9 +78,9 @@ setTimeout(detectIpAccess, 100);
 // Set up a MutationObserver to ensure IP detection persists through any DOM changes
 if (typeof MutationObserver !== 'undefined') {
   const observer = new MutationObserver(() => {
-    if (!document.documentElement.hasAttribute('data-host-is-ip') &&
-        (/^(\d{1,3}\.){3}\d{1,3}$/.test(window.location.hostname) || window.location.hostname === '127.0.0.1')) {
-      document.documentElement.setAttribute('data-host-is-ip', 'true');
+    const enabled = shouldEnableIpCompatMode(window.location.hostname);
+    if (enabled !== document.documentElement.hasAttribute('data-host-is-ip')) {
+      setIpCompatModeEnabled(enabled);
     }
   });
   
@@ -2473,6 +2527,7 @@ const ChatView = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
   const [input, setInput] = useState('');
   const [showContext, setShowContext] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   const LOVING_STATUSES = [
     "Waiting for you, my love...",
@@ -2508,8 +2563,19 @@ const ChatView = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
   }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);  // Correct dependency on messages array
+    const el = messagesContainerRef.current;
+    if (!el) return;
+
+    // IMPORTANT: do not use scrollIntoView() here.
+    // With multiple scrollable ancestors (page/#root/app wrappers), scrollIntoView()
+    // can scroll the *wrong* container, causing the composer to jump into the middle
+    // and new assistant messages to appear "below" the input.
+    const raf = window.requestAnimationFrame(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    });
+
+    return () => window.cancelAnimationFrame(raf);
+  }, [messages.length]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -2560,7 +2626,10 @@ const ChatView = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
   };
 
   return (
-    <div className="flex flex-col h-full relative justify-start items-stretch pt-4 overflow-y-auto" style={{position: 'relative', zIndex: 0}}>
+    <div
+      className="flex flex-col relative justify-start items-stretch pt-4 overflow-hidden min-h-0"
+      style={{ position: 'relative', zIndex: 0, height: '100%' }}
+    >
        {/* Background Effects Layer */}
        <BackgroundEffects />
 
@@ -2693,7 +2762,11 @@ const ChatView = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
          </div>
        )}
        
-       <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-6 relative z-10 pt-8 pb-4 min-h-0" style={{pointerEvents: 'auto', overflowAnchor: 'none', overflowX: 'hidden', justifyContent: 'flex-start', display: 'flex', flexDirection: 'column'}}>
+        <div
+          ref={messagesContainerRef}
+          className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-6 relative z-10 pt-8 pb-4 min-h-0"
+          style={{ pointerEvents: 'auto', overflowAnchor: 'none', overflowX: 'hidden', justifyContent: 'flex-start', display: 'flex', flexDirection: 'column' }}
+        >
          {messages.length === 0 && (
            <div className="flex flex-col items-center text-center opacity-50 select-none pointer-events-none" style={{marginTop: 'auto', marginBottom: 'auto', paddingTop: '2rem', paddingBottom: '2rem'}}>
              <div className="w-20 h-20 bg-linear-to-br from-phoenix-500/20 to-purple-500/20 rounded-full flex items-center justify-center mb-6 animate-pulse">
@@ -2761,7 +2834,7 @@ const ChatView = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
          <div ref={messagesEndRef} />
        </div>
 
-       <div className="p-4 border-t border-white/5 bg-void-900/80 backdrop-blur-xl flex-shrink-0 relative z-[9999]" style={{pointerEvents: 'auto', backgroundColor: '#0d0d0d'}}>
+       <div className="p-4 border-t border-white/5 bg-void-900/80 backdrop-blur-xl flex-shrink-0 relative z-30" style={{pointerEvents: 'auto', backgroundColor: '#0d0d0d'}}>
          <div className="relative flex items-center gap-2 max-w-4xl mx-auto z-30" style={{pointerEvents: 'auto'}}>
             <button
               className="p-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-colors relative z-30"
@@ -3711,9 +3784,564 @@ const EcoSystemView = () => {
   );
 };
 
+// --- Security & Control Diagnostics ---
+
+type ControlDiagnosticsSnapshot = {
+  connected: boolean;
+  last_connect_ts_unix?: number | null;
+  last_disconnect_ts_unix?: number | null;
+  last_heartbeat_sent_ts_unix?: number | null;
+  last_heartbeat_received_ts_unix?: number | null;
+
+  endpoint: string;
+  domain: string;
+
+  hub_root_ca_loaded: boolean;
+  hub_root_ca_sha256?: string | null;
+
+  agent_cert_not_after_ts_unix?: number | null;
+  agent_cert_ttl_seconds?: number | null;
+
+  signature_last_ok_ts_unix?: number | null;
+  signature_last_fail_ts_unix?: number | null;
+  signature_last_fail_error?: string | null;
+
+  verified_commands: Array<{ id: string; command_type: string; ts_unix: number; snippet: string }>;
+  verification_failures: Array<{ ts_unix: number; command_id?: string | null; command_type?: string | null; reason: string }>;
+
+  lpq_len: number;
+  srq_len: number;
+};
+
+type LocalConfigVerificationStatus = {
+  path: string;
+  sig_path: string;
+  last_modified_ts_unix?: number | null;
+  config_version?: string | null;
+  signature_valid?: boolean | null;
+  signature_error?: string | null;
+};
+
+type SecurityDiagnosticsResponse = {
+  control: ControlDiagnosticsSnapshot;
+  config: LocalConfigVerificationStatus;
+};
+
+// --- Control Telemetry Central Store (Diagnostics + SSE) ---
+
+type ControlCommandLogEntry = ControlDiagnosticsSnapshot['verified_commands'][number];
+type ControlRejectedCommand = ControlDiagnosticsSnapshot['verification_failures'][number];
+
+type ControlUiEventEnvelope = {
+  type: string;
+  data?: any;
+};
+
+type ControlStoreState = {
+  diagnostics: SecurityDiagnosticsResponse | null;
+  sse_connected: boolean;
+  loading: boolean;
+  error: string | null;
+  // Rolling logs (SSE-driven)
+  verified_commands: ControlCommandLogEntry[]; // last 20
+  rejected_commands: ControlRejectedCommand[]; // last 10
+  // Raw event log
+  events: Array<{ ts: number; type: string; raw: ControlUiEventEnvelope }>;
+  // UX feedback
+  last_flush?: { ts: number; drained: number };
+};
+
+type ControlStoreApi = ControlStoreState & {
+  refresh_diagnostics: () => Promise<void>;
+  flush_queues: () => Promise<void>;
+};
+
+const ControlStoreContext = createContext<ControlStoreApi | null>(null);
+
+function useControlStore(): ControlStoreApi {
+  const ctx = useContext(ControlStoreContext);
+  if (!ctx) throw new Error('ControlStoreContext missing. Ensure <ControlStoreProvider> is mounted.');
+  return ctx;
+}
+
+const ControlStoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [state, setState] = useState<ControlStoreState>({
+    diagnostics: null,
+    sse_connected: false,
+    loading: false,
+    error: null,
+    verified_commands: [],
+    rejected_commands: [],
+    events: [],
+  });
+
+  const refresh_diagnostics = useCallback(async () => {
+    setState((s) => ({ ...s, loading: true, error: null }));
+    try {
+      const res = await fetch(apiUrl('/api/control/diagnostics'));
+      const j = (await res.json()) as any;
+      if (!res.ok) throw new Error(j?.message || `diagnostics ${res.status}`);
+      const diag = j as SecurityDiagnosticsResponse;
+      setState((s) => ({
+        ...s,
+        diagnostics: diag,
+        loading: false,
+        // Seed rolling logs from snapshot (SSE will take over once events arrive).
+        verified_commands: s.verified_commands.length ? s.verified_commands : (diag?.control?.verified_commands || []).slice(0, 20),
+        rejected_commands: s.rejected_commands.length ? s.rejected_commands : (diag?.control?.verification_failures || []).slice(0, 10),
+      }));
+    } catch (e: any) {
+      setState((s) => ({ ...s, loading: false, error: e?.message || String(e) }));
+    }
+  }, []);
+
+  const flush_queues = useCallback(async () => {
+    setState((s) => ({ ...s, loading: true, error: null }));
+    try {
+      const res = await fetch(apiUrl('/api/control/flush'), { method: 'POST' });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j?.message || `flush ${res.status}`);
+      const drained = typeof j?.drained === 'number' ? j.drained : 0;
+      setState((s) => ({ ...s, loading: false, last_flush: { ts: Date.now(), drained } }));
+      await refresh_diagnostics();
+    } catch (e: any) {
+      setState((s) => ({ ...s, loading: false, error: e?.message || String(e) }));
+    }
+  }, [refresh_diagnostics]);
+
+  // Poll diagnostics periodically (snapshot).
+  useEffect(() => {
+    refresh_diagnostics();
+    const interval = window.setInterval(refresh_diagnostics, 5000);
+    return () => window.clearInterval(interval);
+  }, [refresh_diagnostics]);
+
+  // SSE stream for real-time updates.
+  useEffect(() => {
+    const es = new EventSource(apiUrl('/api/control/events'));
+    es.onopen = () => setState((s) => ({ ...s, sse_connected: true }));
+    es.onmessage = (evt) => {
+      try {
+        const raw = JSON.parse(evt.data) as ControlUiEventEnvelope;
+        const type = raw?.type || 'event';
+        const data = raw?.data;
+
+        setState((prev) => {
+          const next: ControlStoreState = {
+            ...prev,
+            events: [{ ts: Date.now(), type, raw }, ...prev.events].slice(0, 200),
+          };
+
+          // Rolling command logs.
+          if (type === 'CommandVerified' && data?.entry) {
+            next.verified_commands = [data.entry as ControlCommandLogEntry, ...prev.verified_commands].slice(0, 20);
+          }
+          if (type === 'CommandRejected' && data?.failure) {
+            next.rejected_commands = [data.failure as ControlRejectedCommand, ...prev.rejected_commands].slice(0, 10);
+          }
+
+          // Opportunistic merge into diagnostics for live UI.
+          if (next.diagnostics?.control) {
+            const control = { ...next.diagnostics.control };
+
+            if (type === 'Connected' && typeof data?.ts_unix === 'number') {
+              control.connected = true;
+              control.last_connect_ts_unix = data.ts_unix;
+            }
+            if (type === 'Disconnected' && typeof data?.ts_unix === 'number') {
+              control.connected = false;
+              control.last_disconnect_ts_unix = data.ts_unix;
+            }
+            if (type === 'HeartbeatSent' && typeof data?.ts_unix === 'number') {
+              control.last_heartbeat_sent_ts_unix = data.ts_unix;
+            }
+            if (type === 'HeartbeatReceived' && typeof data?.ts_unix === 'number') {
+              control.last_heartbeat_received_ts_unix = data.ts_unix;
+            }
+            if (type === 'QueueUpdated' && typeof data?.lpq_len === 'number' && typeof data?.srq_len === 'number') {
+              control.lpq_len = data.lpq_len;
+              control.srq_len = data.srq_len;
+            }
+
+            next.diagnostics = { ...next.diagnostics, control };
+          }
+
+          return next;
+        });
+      } catch {
+        // ignore malformed events
+      }
+    };
+    es.onerror = () => setState((s) => ({ ...s, sse_connected: false }));
+    return () => es.close();
+  }, []);
+
+  const api: ControlStoreApi = {
+    ...state,
+    refresh_diagnostics,
+    flush_queues,
+  };
+
+  return <ControlStoreContext.Provider value={api}>{children}</ControlStoreContext.Provider>;
+};
+
+const QueueManagementView: React.FC = () => {
+  const { diagnostics, loading, error, last_flush, flush_queues, refresh_diagnostics } = useControlStore();
+  const c = diagnostics?.control;
+  const backlog = (c?.lpq_len || 0) + (c?.srq_len || 0);
+  const fmt = (ts: number) => new Date(ts).toLocaleString();
+
+  return (
+    <div className="h-full flex flex-col bg-[#0f0b15] overflow-y-auto custom-scrollbar">
+      <div className="p-8 max-w-4xl mx-auto w-full space-y-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+              <Database size={18} className="text-phoenix-400" /> Queue Management
+            </h2>
+            <p className="text-xs text-gray-500 mt-1">LPQ/SRQ visibility + manual flush control.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={refresh_diagnostics}
+              className="px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-200 rounded-lg border border-white/10 text-sm"
+              disabled={loading}
+            >
+              {loading ? 'Refreshing…' : 'Refresh'}
+            </button>
+            <button
+              onClick={flush_queues}
+              className="px-4 py-2 rounded-lg border text-sm font-semibold bg-white/5 text-gray-200 border-white/10 hover:bg-white/10 disabled:opacity-50"
+              disabled={loading || backlog === 0}
+              title={backlog === 0 ? 'No queued messages' : 'Force flush queued outbound messages'}
+            >
+              Force Flush Queues
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div className="bg-red-600/10 border border-red-600/30 rounded-lg p-3 text-xs text-red-300 font-mono">{error}</div>
+        )}
+
+        <div className="glass-panel p-6 rounded-2xl border border-white/10">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-black/40 border border-white/10 rounded-lg p-4">
+              <div className="text-[10px] text-gray-500 uppercase font-semibold">LPQ</div>
+              <div className="text-3xl text-white font-mono mt-2">{c?.lpq_len ?? '—'}</div>
+              <div className="text-xs text-gray-500 mt-2">Local Persistent Queue</div>
+            </div>
+            <div className="bg-black/40 border border-white/10 rounded-lg p-4">
+              <div className="text-[10px] text-gray-500 uppercase font-semibold">SRQ</div>
+              <div className="text-3xl text-white font-mono mt-2">{c?.srq_len ?? '—'}</div>
+              <div className="text-xs text-gray-500 mt-2">Signature Request Queue</div>
+            </div>
+            <div className="bg-black/40 border border-white/10 rounded-lg p-4">
+              <div className="text-[10px] text-gray-500 uppercase font-semibold">Backlog</div>
+              <div className="text-3xl text-white font-mono mt-2">{backlog}</div>
+              <div className="text-xs text-gray-500 mt-2">LPQ + SRQ combined</div>
+            </div>
+          </div>
+
+          {last_flush && (
+            <div className="mt-4 text-xs text-gray-400 font-mono">Last flush: drained={last_flush.drained} @ {fmt(last_flush.ts)}</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const SecurityDiagnosticsView: React.FC = () => {
+  const {
+    diagnostics,
+    sse_connected,
+    loading,
+    error,
+    verified_commands,
+    rejected_commands,
+    events,
+    refresh_diagnostics,
+    flush_queues,
+  } = useControlStore();
+
+  const [filter, setFilter] = useState('');
+
+  const formatTs = (ts?: number | null) => {
+    if (!ts) return '—';
+    return new Date(ts * 1000).toLocaleString();
+  };
+
+  const formatTtl = (ttl?: number | null) => {
+    if (ttl == null) return '—';
+    const s = Math.max(0, ttl);
+    const days = Math.floor(s / 86400);
+    const hours = Math.floor((s % 86400) / 3600);
+    const mins = Math.floor((s % 3600) / 60);
+    return `${days}d ${hours}h ${mins}m`;
+  };
+
+  const c = diagnostics?.control;
+  const cfg = diagnostics?.config;
+  const backlog = (c?.lpq_len || 0) + (c?.srq_len || 0);
+  const backlogThreshold = 20;
+
+  const q = filter.trim().toLowerCase();
+  const filteredVerified = verified_commands.filter((x) => {
+    if (!q) return true;
+    return `${x.command_type} ${x.id} ${x.snippet}`.toLowerCase().includes(q);
+  });
+  const filteredRejected = rejected_commands.filter((x) => {
+    if (!q) return true;
+    return `${x.command_type ?? ''} ${x.command_id ?? ''} ${x.reason}`.toLowerCase().includes(q);
+  });
+
+  return (
+    <div className="h-full flex flex-col bg-[#0f0b15] overflow-y-auto custom-scrollbar">
+      <div className="p-8 max-w-6xl mx-auto w-full space-y-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+              <ShieldCheck size={18} className="text-phoenix-400" /> Security & Control Diagnostics
+            </h2>
+            <p className="text-xs text-gray-500 mt-1">
+              Real-time control-channel telemetry (gRPC mTLS) + local configuration signature verification.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={refresh_diagnostics}
+              className="px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-200 rounded-lg border border-white/10 text-sm"
+              disabled={loading}
+            >
+              {loading ? 'Refreshing…' : 'Refresh'}
+            </button>
+            <button
+              onClick={flush_queues}
+              className={`px-4 py-2 rounded-lg border text-sm font-semibold transition-all ${backlog > backlogThreshold ? 'bg-red-500/10 text-red-300 border-red-500/20 hover:bg-red-500/20' : 'bg-white/5 text-gray-200 border-white/10 hover:bg-white/10'}`}
+              disabled={loading || backlog === 0}
+              title={backlog === 0 ? 'No queued messages' : 'Force flush queued outbound messages'}
+            >
+              Force Flush Queues
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div className="bg-red-600/10 border border-red-600/30 rounded-lg p-3 text-xs text-red-300 font-mono">
+            {error}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-gray-500 font-mono">
+            SSE: <span className={sse_connected ? 'text-green-400' : 'text-yellow-400'}>{sse_connected ? 'CONNECTED' : 'DISCONNECTED'}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="bg-void-900 border border-white/10 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-phoenix-500 font-mono w-72"
+              placeholder="Filter commands (type/id/reason/snippet)…"
+            />
+          </div>
+        </div>
+
+        {/* Control Channel Status */}
+        <div className="glass-panel p-6 rounded-2xl border border-white/10">
+          <div className="flex items-start justify-between gap-6">
+            <div>
+              <div className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Control Channel</div>
+              <div className="mt-2 flex items-center gap-3">
+                <span className={`px-2 py-1 rounded-full text-xs font-bold border ${c?.connected ? 'bg-green-600/10 text-green-300 border-green-600/20' : 'bg-yellow-600/10 text-yellow-300 border-yellow-600/20'}`}>
+                  {c?.connected ? 'CONNECTED' : 'DISCONNECTED'}
+                </span>
+                <span className="text-xs text-gray-400 font-mono">{c?.endpoint || '—'}</span>
+              </div>
+              <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <div className="bg-black/40 border border-white/10 rounded-lg p-3">
+                  <div className="text-[10px] text-gray-500 uppercase font-semibold">Last Connect</div>
+                  <div className="text-white font-mono text-xs mt-1">{formatTs(c?.last_connect_ts_unix)}</div>
+                </div>
+                <div className="bg-black/40 border border-white/10 rounded-lg p-3">
+                  <div className="text-[10px] text-gray-500 uppercase font-semibold">Last Disconnect</div>
+                  <div className="text-white font-mono text-xs mt-1">{formatTs(c?.last_disconnect_ts_unix)}</div>
+                </div>
+                <div className="bg-black/40 border border-white/10 rounded-lg p-3">
+                  <div className="text-[10px] text-gray-500 uppercase font-semibold">Last Heartbeat Sent</div>
+                  <div className="text-white font-mono text-xs mt-1">{formatTs(c?.last_heartbeat_sent_ts_unix)}</div>
+                </div>
+                <div className="bg-black/40 border border-white/10 rounded-lg p-3">
+                  <div className="text-[10px] text-gray-500 uppercase font-semibold">Last Heartbeat Received</div>
+                  <div className="text-white font-mono text-xs mt-1">{formatTs(c?.last_heartbeat_received_ts_unix)}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="w-full md:w-80 space-y-3">
+              <div className="bg-black/40 border border-white/10 rounded-lg p-3">
+                <div className="text-[10px] text-gray-500 uppercase font-semibold">mTLS (Agent Cert)</div>
+                <div className="text-white text-xs mt-1">
+                  Expires: <span className="font-mono">{formatTs(c?.agent_cert_not_after_ts_unix)}</span>
+                </div>
+                <div className="text-white text-xs mt-1">
+                  TTL: <span className="font-mono">{formatTtl(c?.agent_cert_ttl_seconds)}</span>
+                </div>
+              </div>
+              <div className="bg-black/40 border border-white/10 rounded-lg p-3">
+                <div className="text-[10px] text-gray-500 uppercase font-semibold">CA Pin</div>
+                <div className={`text-xs mt-1 font-bold ${c?.hub_root_ca_loaded ? 'text-green-400' : 'text-red-400'}`}>
+                  {c?.hub_root_ca_loaded ? 'LOADED' : 'NOT LOADED'}
+                </div>
+                <div className="text-[10px] text-gray-400 mt-2 font-mono break-all">
+                  sha256: {c?.hub_root_ca_sha256 || '—'}
+                </div>
+              </div>
+              <div className="bg-black/40 border border-white/10 rounded-lg p-3">
+                <div className="text-[10px] text-gray-500 uppercase font-semibold">Queues</div>
+                <div className="mt-1 text-xs text-white">
+                  LPQ: <span className="font-mono">{c?.lpq_len ?? '—'}</span> • SRQ: <span className="font-mono">{c?.srq_len ?? '—'}</span>
+                </div>
+                {backlog > backlogThreshold && (
+                  <div className="mt-2 text-[10px] text-red-300">Backlog exceeds threshold ({backlogThreshold}). Consider flush.</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Signature Verification */}
+        <div className="glass-panel p-6 rounded-2xl border border-white/10">
+          <div className="flex items-center justify-between">
+            <div className="text-white font-bold">Signature Verification (Control Commands)</div>
+            <div className="text-xs text-gray-500 font-mono">Ed25519</div>
+          </div>
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="bg-black/40 border border-white/10 rounded-lg p-3">
+              <div className="text-[10px] text-gray-500 uppercase font-semibold">Last OK</div>
+              <div className="text-white font-mono text-xs mt-1">{formatTs(c?.signature_last_ok_ts_unix)}</div>
+            </div>
+            <div className="bg-black/40 border border-white/10 rounded-lg p-3">
+              <div className="text-[10px] text-gray-500 uppercase font-semibold">Last FAIL</div>
+              <div className="text-white font-mono text-xs mt-1">{formatTs(c?.signature_last_fail_ts_unix)}</div>
+            </div>
+            <div className="bg-black/40 border border-white/10 rounded-lg p-3">
+              <div className="text-[10px] text-gray-500 uppercase font-semibold">Fail Reason</div>
+              <div className="text-red-300 font-mono text-[11px] mt-1 break-words">{c?.signature_last_fail_error || '—'}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Command Log */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="glass-panel p-6 rounded-2xl border border-white/10">
+            <div className="flex items-center justify-between">
+              <div className="text-white font-bold">Last 20 Verified Commands</div>
+              <div className="text-xs text-gray-500 font-mono">SSE</div>
+            </div>
+            <div className="mt-4 space-y-3">
+              {filteredVerified.length === 0 ? (
+                <div className="text-gray-500 text-sm">No verified commands yet.</div>
+              ) : (
+                filteredVerified.slice(0, 20).map((x) => (
+                  <div key={x.id + ':' + x.ts_unix} className="bg-black/40 border border-white/10 rounded-lg p-3">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="text-xs text-white font-semibold">{x.command_type}</div>
+                      <div className="text-[10px] text-gray-500 font-mono">{formatTs(x.ts_unix)}</div>
+                    </div>
+                    <div className="mt-1 text-[10px] text-gray-500 font-mono break-all">id: {x.id}</div>
+                    {x.snippet && (
+                      <div className="mt-2 text-xs text-gray-300 font-mono whitespace-pre-wrap">{x.snippet}</div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="glass-panel p-6 rounded-2xl border border-white/10">
+            <div className="flex items-center justify-between">
+              <div className="text-white font-bold">Last 10 Rejected Commands</div>
+              <div className="text-xs text-gray-500 font-mono">SSE</div>
+            </div>
+            <div className="mt-4 space-y-3">
+              {filteredRejected.length === 0 ? (
+                <div className="text-gray-500 text-sm">No failures recorded.</div>
+              ) : (
+                filteredRejected.slice(0, 10).map((f, idx) => (
+                  <div key={idx + ':' + f.ts_unix} className="bg-red-600/10 border border-red-600/20 rounded-lg p-3">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="text-xs text-red-200 font-semibold">{f.command_type || 'unknown'}</div>
+                      <div className="text-[10px] text-gray-500 font-mono">{formatTs(f.ts_unix)}</div>
+                    </div>
+                    {f.command_id && <div className="mt-1 text-[10px] text-gray-400 font-mono break-all">id: {f.command_id}</div>}
+                    <div className="mt-2 text-xs text-red-100 font-mono whitespace-pre-wrap">{f.reason}</div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Local Config Verification */}
+        <div className="glass-panel p-6 rounded-2xl border border-white/10">
+          <div className="flex items-center justify-between">
+            <div className="text-white font-bold">Local Config Verification</div>
+            <div className="text-xs text-gray-500 font-mono">{cfg?.path || '—'}</div>
+          </div>
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="bg-black/40 border border-white/10 rounded-lg p-3">
+              <div className="text-[10px] text-gray-500 uppercase font-semibold">Config Version</div>
+              <div className="text-white font-mono text-xs mt-1">{cfg?.config_version || '—'}</div>
+            </div>
+            <div className="bg-black/40 border border-white/10 rounded-lg p-3">
+              <div className="text-[10px] text-gray-500 uppercase font-semibold">Last Modified</div>
+              <div className="text-white font-mono text-xs mt-1">{formatTs(cfg?.last_modified_ts_unix)}</div>
+            </div>
+            <div className="bg-black/40 border border-white/10 rounded-lg p-3">
+              <div className="text-[10px] text-gray-500 uppercase font-semibold">Signature</div>
+              <div className={`text-xs font-bold mt-1 ${cfg?.signature_valid ? 'text-green-400' : cfg?.signature_valid === false ? 'text-red-400' : 'text-gray-500'}`}>
+                {cfg?.signature_valid == null ? 'UNKNOWN' : cfg.signature_valid ? 'VALID' : 'INVALID'}
+              </div>
+              <div className="text-[10px] text-gray-500 mt-1 font-mono break-all">sig: {cfg?.sig_path || '—'}</div>
+            </div>
+            <div className="bg-black/40 border border-white/10 rounded-lg p-3">
+              <div className="text-[10px] text-gray-500 uppercase font-semibold">Error</div>
+              <div className="text-red-300 font-mono text-[11px] mt-1 break-words">{cfg?.signature_error || '—'}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Event Log */}
+        <div className="glass-panel p-6 rounded-2xl border border-white/10">
+          <div className="flex items-center justify-between">
+            <div className="text-white font-bold">Event Log (SSE)</div>
+            <div className="text-xs text-gray-500 font-mono">last 50</div>
+          </div>
+          <div className="mt-4 space-y-2 max-h-[320px] overflow-y-auto custom-scrollbar">
+            {events.length === 0 ? (
+              <div className="text-gray-500 text-sm">No events yet.</div>
+            ) : (
+              events.slice(0, 50).map((e, idx) => (
+                <div key={idx} className="bg-black/40 border border-white/10 rounded-lg p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-white font-semibold">{e.type}</div>
+                    <div className="text-[10px] text-gray-500 font-mono">{new Date(e.ts).toLocaleTimeString()}</div>
+                  </div>
+                  <pre className="mt-2 text-[11px] text-gray-300 font-mono whitespace-pre-wrap wrap-break-word">{JSON.stringify(e.raw, null, 2)}</pre>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const DashboardLayout = () => {
   const { clearHistory, relationalScore, sentiment, setRelationalScore, setSentiment, isConnected, phoenixName, setKeylogger, setMouseJigger } = usePhoenix();
-  const [activeView, setActiveView] = useState<'chat' | 'archetype' | 'settings' | 'memories' | 'orchestrator' | 'studio' | 'google' | 'devtools' | 'ecosystem'>('chat');
+  const [activeView, setActiveView] = useState<'chat' | 'archetype' | 'settings' | 'memories' | 'orchestrator' | 'studio' | 'google' | 'devtools' | 'ecosystem' | 'security' | 'queues'>('chat');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [uiSettings, setUiSettings] = useLocalStorageJsonState<UiSettings>('phoenix.ui.settings', DEFAULT_UI_SETTINGS);
@@ -3756,6 +4384,8 @@ const DashboardLayout = () => {
         <div className="px-4 space-y-2 mt-8">
           <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 mb-2">System</div>
           <SidebarItem icon={Trash2} label="Clear Memory" active={false} danger onClick={() => { setIsClearModalOpen(true); setIsMobileMenuOpen(false); }} />
+          <SidebarItem icon={Database} label="Queue Mgmt" active={activeView === 'queues'} onClick={() => handleNavigation('queues')} />
+          <SidebarItem icon={ShieldCheck} label="Security & Control" active={activeView === 'security'} onClick={() => handleNavigation('security')} />
           <SidebarItem icon={Terminal} label="Self-Mod Console" active={activeView === 'devtools'} onClick={() => handleNavigation('devtools')} />
           <SidebarItem icon={Settings} label="Settings" active={activeView === 'settings'} onClick={() => handleNavigation('settings')} />
         </div>
@@ -3787,11 +4417,17 @@ const DashboardLayout = () => {
           {/* Ecosystem */}
           {activeView === 'ecosystem' && <EcoSystemView />}
           
-          {/* DevTools */}
-          {activeView === 'devtools' && <DevToolsView />}
-          
-          {/* Memories */}
-          {activeView === 'memories' && <MemoriesView />}
+           {/* DevTools */}
+           {activeView === 'devtools' && <DevToolsView />}
+
+           {/* Security */}
+           {activeView === 'security' && <SecurityDiagnosticsView />}
+
+           {/* Queues */}
+           {activeView === 'queues' && <QueueManagementView />}
+            
+           {/* Memories */}
+           {activeView === 'memories' && <MemoriesView />}
           
           {/* Settings */}
           {activeView === 'settings' && (
@@ -3912,18 +4548,15 @@ const DashboardLayout = () => {
 // Mount
 const rootElement = document.getElementById('root');
 if (rootElement) {
-  // Check if host is numeric IP address by checking for IPv4 pattern
-  const isIpAddress = /^[0-9.]+$/.test(window.location.hostname);
-  
-  // Add data attribute to document to support our IP-specific CSS
-  if (isIpAddress) {
-    document.documentElement.setAttribute('data-host-is-ip', 'true');
-  }
+  // Ensure the mount path uses the same single-source-of-truth logic.
+  setIpCompatModeEnabled(shouldEnableIpCompatMode(window.location.hostname));
 
   const root = createRoot(rootElement);
   root.render(
     <PhoenixProvider>
-      <DashboardLayout />
+      <ControlStoreProvider>
+        <DashboardLayout />
+      </ControlStoreProvider>
     </PhoenixProvider>
   );
 }

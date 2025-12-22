@@ -7,6 +7,11 @@ pub mod learning_pipeline;
 pub mod psychological_mapping;
 pub mod reasoning;
 pub mod tool_agent;
+pub mod crypto;
+pub mod mtls;
+pub mod networking;
+pub mod hub_errors;
+pub mod control_channel;
 
 // Re-export commonly used types
 pub use fantasy_dyad::{DriveMap, FantasyDyadAgent, PersonaState, ToneProfile};

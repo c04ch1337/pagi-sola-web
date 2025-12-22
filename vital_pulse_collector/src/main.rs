@@ -6,9 +6,28 @@ use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Res
 use llm_orchestrator::LLMOrchestrator;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::io;
+use std::io::BufReader;
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::{fs::File, sync::Arc};
 use tracing::{error, info, warn};
 use uuid::Uuid;
+
+use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+use rustls::server::WebPkiClientVerifier;
+use rustls::RootCertStore;
+
+use common_types::api::ApiErrorResponse;
+
+fn api_error_db_down(instance: &str, detail: impl Into<String>) -> ApiErrorResponse {
+    ApiErrorResponse::new(
+        "503-DB-DOWN",
+        "Database unavailable",
+        detail,
+        503,
+        instance,
+    )
+}
 
 fn env_nonempty(key: &str) -> Option<String> {
     std::env::var(key)
@@ -175,7 +194,7 @@ async fn ingest(
     req: HttpRequest,
     state: web::Data<AppState>,
     body: web::Json<TelemetryEnvelope>,
-) -> impl Responder {
+) -> Result<HttpResponse, ApiErrorResponse> {
     let tier = tier_from_x402(&req);
     let ts_unix = body.ts_unix.unwrap_or_else(now_unix);
     let id = Uuid::new_v4().to_string();
@@ -195,16 +214,22 @@ async fn ingest(
         Ok(v) => v,
         Err(e) => {
             error!("failed to serialize telemetry: {e}");
-            return HttpResponse::BadRequest().json(json!({"error": "invalid telemetry"}));
+            return Err(ApiErrorResponse::new(
+                "400-INVALID-TELEMETRY",
+                "Invalid telemetry",
+                format!("telemetry serialization failed: {e}"),
+                400,
+                req.path(),
+            ));
         }
     };
 
     if let Err(e) = state.telemetry_tree.insert(key, val) {
         error!("failed to write telemetry to sled: {e}");
-        return HttpResponse::InternalServerError().json(json!({"error": "db write failed"}));
+        return Err(api_error_db_down(req.path(), format!("db write failed: {e}")));
     }
 
-    HttpResponse::Ok().json(json!({"status": "ingested", "tier": tier, "id": id}))
+    Ok(HttpResponse::Ok().json(json!({"status": "ingested", "tier": tier, "id": id})))
 }
 
 fn read_last_n(tree: &sled::Tree, n: usize) -> Result<Vec<StoredTelemetry>, String> {
@@ -238,11 +263,11 @@ fn last_insight(insights_tree: &sled::Tree) -> Result<Option<InsightRecord>, Str
     }
 }
 
-async fn get_insights(state: web::Data<AppState>) -> impl Responder {
+async fn get_insights(req: HttpRequest, state: web::Data<AppState>) -> Result<HttpResponse, ApiErrorResponse> {
     match last_insight(&state.insights_tree) {
-        Ok(Some(rec)) => HttpResponse::Ok().json(rec),
-        Ok(None) => HttpResponse::Ok().json(json!({"status": "no_insights"})),
-        Err(e) => HttpResponse::InternalServerError().json(json!({"error": e})),
+        Ok(Some(rec)) => Ok(HttpResponse::Ok().json(rec)),
+        Ok(None) => Ok(HttpResponse::Ok().json(json!({"status": "no_insights"}))),
+        Err(e) => Err(api_error_db_down(req.path(), e)),
     }
 }
 
@@ -250,7 +275,11 @@ fn insight_key(ts_unix: i64, id: &str) -> Vec<u8> {
     make_key(ts_unix, id)
 }
 
-async fn analyze(req: HttpRequest, state: web::Data<AppState>, body: web::Json<AnalyzeRequest>) -> impl Responder {
+async fn analyze(
+    req: HttpRequest,
+    state: web::Data<AppState>,
+    body: web::Json<AnalyzeRequest>,
+) -> Result<HttpResponse, ApiErrorResponse> {
     let tier = tier_from_x402(&req);
 
     let last_n = match (tier.as_str(), body.last_n) {
@@ -265,7 +294,7 @@ async fn analyze(req: HttpRequest, state: web::Data<AppState>, body: web::Json<A
         Ok(v) => v,
         Err(e) => {
             error!("telemetry read failed: {e}");
-            return HttpResponse::InternalServerError().json(json!({"error": e}));
+            return Err(api_error_db_down(req.path(), e));
         }
     };
 
@@ -273,10 +302,13 @@ async fn analyze(req: HttpRequest, state: web::Data<AppState>, body: web::Json<A
         Some(llm) => llm,
         None => {
             warn!("LLM not available; OPENROUTER_API_KEY missing?");
-            return HttpResponse::ServiceUnavailable().json(json!({
-                "error": "LLM not available (OPENROUTER_API_KEY missing?)",
-                "tier": tier,
-            }));
+            return Err(ApiErrorResponse::new(
+                "503-LLM-DOWN",
+                "LLM unavailable",
+                "LLM not available (OPENROUTER_API_KEY missing?)",
+                503,
+                req.path(),
+            ));
         }
     };
 
@@ -302,7 +334,13 @@ async fn analyze(req: HttpRequest, state: web::Data<AppState>, body: web::Json<A
         Ok(s) => s,
         Err(e) => {
             error!("openrouter analysis failed: {e}");
-            return HttpResponse::BadGateway().json(json!({"error": e, "tier": tier}));
+            return Err(ApiErrorResponse::new(
+                "502-LLM-GATEWAY",
+                "Upstream LLM gateway error",
+                format!("openrouter analysis failed: {e}"),
+                502,
+                req.path(),
+            ));
         }
     };
 
@@ -318,19 +356,82 @@ async fn analyze(req: HttpRequest, state: web::Data<AppState>, body: web::Json<A
     let v = serde_json::to_vec(&rec).unwrap_or_else(|_| Vec::new());
     if let Err(e) = state.insights_tree.insert(k, v) {
         error!("failed to persist insight: {e}");
-        return HttpResponse::InternalServerError().json(json!({"error": "db write failed"}));
+        return Err(api_error_db_down(req.path(), format!("db write failed: {e}")));
     }
 
-    HttpResponse::Ok().json(json!({
+    Ok(HttpResponse::Ok().json(json!({
         "status": "ok",
         "tier": tier,
         "last_n": last_n,
         "insight": rec,
-    }))
+    })))
 }
 
 fn open_tree(db: &sled::Db, name: &str) -> Result<sled::Tree, sled::Error> {
     db.open_tree(name)
+}
+
+fn read_env_required(key: &str) -> Result<String, io::Error> {
+    std::env::var(key).map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, format!("missing {key}")))
+}
+
+fn load_certs_from_pem(path: &str) -> Result<Vec<CertificateDer<'static>>, io::Error> {
+    let f = File::open(path)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("failed to open cert file '{path}': {e}")))?;
+    let mut reader = BufReader::new(f);
+    let certs = rustls_pemfile::certs(&mut reader)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("failed to parse certs from '{path}': {e}")))?;
+    if certs.is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("no certificates found in '{path}'"),
+        ));
+    }
+    Ok(certs)
+}
+
+fn load_private_key_from_pem(path: &str) -> Result<PrivateKeyDer<'static>, io::Error> {
+    let f = File::open(path)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("failed to open key file '{path}': {e}")))?;
+    let mut reader = BufReader::new(f);
+
+    // Accept PKCS8, RSA, or SEC1 keys.
+    let key = rustls_pemfile::private_key(&mut reader)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("failed to parse private key from '{path}': {e}")))?
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, format!("no private key found in '{path}'")))?;
+    Ok(key)
+}
+
+fn build_mtls_server_config() -> Result<rustls::ServerConfig, io::Error> {
+    // Server identity presented to clients.
+    let tls_cert_path = read_env_required("HUB_TLS_CERT_PATH")?;
+    let tls_key_path = read_env_required("HUB_TLS_KEY_PATH")?;
+
+    // Trust store used to verify client certificates.
+    // Only clients whose certificate chains to this CA will complete the TLS handshake.
+    let queen_ca_path = read_env_required("QUEEN_CA_CERT_PATH")?;
+
+    let server_certs = load_certs_from_pem(&tls_cert_path)?;
+    let server_key = load_private_key_from_pem(&tls_key_path)?;
+
+    let mut roots = RootCertStore::empty();
+    for ca in load_certs_from_pem(&queen_ca_path)? {
+        roots
+            .add(ca)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("failed to add CA cert from '{queen_ca_path}': {e}")))?;
+    }
+
+    let verifier = WebPkiClientVerifier::builder(Arc::new(roots))
+        .build()
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("failed to build client cert verifier: {e}")))?;
+
+    let cfg = rustls::ServerConfig::builder()
+        .with_client_cert_verifier(verifier)
+        .with_single_cert(server_certs, server_key)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("invalid server cert/key: {e}")))?;
+
+    Ok(cfg)
 }
 
 #[actix_web::main]
@@ -364,7 +465,8 @@ async fn main() -> std::io::Result<()> {
         }
     };
 
-    info!("Vital Pulse Collector online at http://{bind} (db={db_path})");
+    let tls_cfg = build_mtls_server_config()?;
+    info!("Vital Pulse Collector online at https://{bind} (mTLS required, db={db_path})");
 
     let state = web::Data::new(AppState {
         db,
@@ -382,7 +484,8 @@ async fn main() -> std::io::Result<()> {
             .service(web::resource("/analyze").route(web::post().to(analyze)))
             .service(web::resource("/insights").route(web::get().to(get_insights)))
     })
-    .bind(bind)?
+    // Require a valid client certificate signed by `QUEEN_CA_CERT_PATH`.
+    .bind_rustls_0_23(bind, tls_cfg)?
     .run()
     .await
 }

@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 pub mod ports;
+pub mod api;
 
 /// Evolution log entry (identity versioning).
 ///

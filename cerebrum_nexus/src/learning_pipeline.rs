@@ -13,6 +13,10 @@ use tokio::sync::Mutex;
 use tracing::{info, warn};
 use url::Url;
 
+use crate::crypto::{decode_b64, verify_payload};
+use crate::mtls::create_mtls_client;
+use crate::networking::{api_error_from_non_success_response, determine_backoff_strategy};
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LearningOverrides {
     #[serde(default)]
@@ -60,7 +64,26 @@ pub struct UpdateEnvelope {
     pub update_type: String,
     #[serde(default)]
     pub tier_required: String,
+
+    /// Base64-encoded signature over the update payload bytes.
+    ///
+    /// Security contract:
+    /// - For critical update types (config/patch), this MUST be present and valid.
+    #[serde(default)]
+    pub signature_b64: Option<String>,
+
+    /// Optional base64-encoded payload bytes (preferred).
+    ///
+    /// If present, verification is performed over these exact bytes and `payload` is treated as
+    /// a convenience/preview. This avoids ambiguities from JSON re-serialization.
+    #[serde(default)]
+    pub payload_b64: Option<String>,
+
     pub payload: serde_json::Value,
+}
+
+fn is_critical_update_type(update_type: &str) -> bool {
+    matches!(update_type, "prompt_tweak" | "model_tweak" | "json_patch" | "yaml_graft")
 }
 
 #[derive(Debug, Clone, Default)]
@@ -179,7 +202,13 @@ pub async fn start_telemetry_loop(
     state: std::sync::Arc<Mutex<LearningPipelineState>>,
     master_mode: bool,
 ) {
-    let client = reqwest::Client::new();
+    let client = match create_mtls_client() {
+        Ok(c) => c,
+        Err(e) => {
+            warn!("telemetry loop disabled: failed to build mTLS client: {e}");
+            return;
+        }
+    };
     let interval_secs = std::env::var("ORCH_SLAVE_SYNC_INTERVAL")
         .ok()
         .and_then(|s| s.parse::<u64>().ok())
@@ -210,7 +239,16 @@ pub async fn start_telemetry_loop(
         match client.post(&endpoint).json(&body).send().await {
             Ok(resp) => {
                 if !resp.status().is_success() {
-                    warn!("telemetry ingest failed status={}", resp.status());
+                    let api_err =
+                        api_error_from_non_success_response(resp, "/ingest").await;
+                    let strategy = determine_backoff_strategy(&api_err.code);
+                    warn!(
+                        "telemetry ingest failed status={} code={} strategy={:?} detail={}",
+                        api_err.http_status,
+                        api_err.code,
+                        strategy,
+                        api_err.detail
+                    );
                 }
             }
             Err(e) => warn!("telemetry ingest error: {e}"),
@@ -222,6 +260,12 @@ pub async fn start_update_subscription_loop(
     orch_id: String,
     state: std::sync::Arc<Mutex<LearningPipelineState>>,
 ) {
+    // QUEEN's signing public key (Ed25519) used to verify critical updates.
+    // Expected to be base64 (standard or urlsafe, padded or not).
+    let queen_pubkey: Option<Vec<u8>> = std::env::var("QUEEN_SIGNING_PUBLIC_KEY_B64")
+        .ok()
+        .and_then(|s| decode_b64(&s).ok());
+
     let mut backoff = Duration::from_secs(1);
     loop {
         let distributor_url = { state.lock().await.distributor_url.clone() };
@@ -258,6 +302,96 @@ pub async fn start_update_subscription_loop(
                     match msg {
                         Ok(tokio_tungstenite::tungstenite::Message::Text(txt)) => {
                             if let Ok(update) = serde_json::from_str::<UpdateEnvelope>(&txt) {
+                                // Enforce signature verification for critical payloads.
+                                if is_critical_update_type(update.update_type.as_str()) {
+                                    let Some(pubkey) = queen_pubkey.as_deref() else {
+                                        let mut guard = state.lock().await;
+                                        guard.last_error = Some(
+                                            "missing QUEEN_SIGNING_PUBLIC_KEY_B64; cannot verify critical update"
+                                                .to_string(),
+                                        );
+                                        continue;
+                                    };
+
+                                    let sig_b64 = match update.signature_b64.as_deref() {
+                                        Some(s) if !s.trim().is_empty() => s,
+                                        _ => {
+                                            let mut guard = state.lock().await;
+                                            guard.last_error = Some(
+                                                format!(
+                                                    "blocked unsigned critical update (type={})",
+                                                    update.update_type
+                                                ),
+                                            );
+                                            continue;
+                                        }
+                                    };
+
+                                    let signature = match decode_b64(sig_b64) {
+                                        Ok(b) => b,
+                                        Err(e) => {
+                                            let mut guard = state.lock().await;
+                                            guard.last_error = Some(format!(
+                                                "invalid signature_b64 for update_id={}: {e}",
+                                                update.update_id
+                                            ));
+                                            continue;
+                                        }
+                                    };
+
+                                    // Prefer verifying over sender-provided raw payload bytes.
+                                    let signed_payload: Vec<u8> = if let Some(pb64) = update.payload_b64.as_deref()
+                                    {
+                                        match decode_b64(pb64) {
+                                            Ok(b) => b,
+                                            Err(e) => {
+                                                let mut guard = state.lock().await;
+                                                guard.last_error = Some(format!(
+                                                    "invalid payload_b64 for update_id={}: {e}",
+                                                    update.update_id
+                                                ));
+                                                continue;
+                                            }
+                                        }
+                                    } else {
+                                        // Fallback: re-serialize payload JSON. This may not match the sender's
+                                        // exact signing bytes if key ordering differs.
+                                        match serde_json::to_vec(&update.payload) {
+                                            Ok(b) => b,
+                                            Err(e) => {
+                                                let mut guard = state.lock().await;
+                                                guard.last_error = Some(format!(
+                                                    "failed to serialize payload for update_id={}: {e}",
+                                                    update.update_id
+                                                ));
+                                                continue;
+                                            }
+                                        }
+                                    };
+
+                                    match verify_payload(&signed_payload, &signature, pubkey) {
+                                        Ok(true) => {
+                                            // Verified: apply.
+                                        }
+                                        Ok(false) => {
+                                            let mut guard = state.lock().await;
+                                            guard.last_error = Some(format!(
+                                                "signature verification failed (update_id={}, type={})",
+                                                update.update_id, update.update_type
+                                            ));
+                                            continue;
+                                        }
+                                        Err(e) => {
+                                            let mut guard = state.lock().await;
+                                            guard.last_error = Some(format!(
+                                                "signature verification error (update_id={}, type={}): {e}",
+                                                update.update_id, update.update_type
+                                            ));
+                                            continue;
+                                        }
+                                    }
+                                }
+
                                 let mut guard = state.lock().await;
                                 guard.apply_update(&update, &orch_id);
                             }

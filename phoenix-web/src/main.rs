@@ -11,6 +11,8 @@ use actix_cors::Cors;
 use actix_files::NamedFile;
 use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer, Responder, ResponseError};
 use actix_web::http::StatusCode;
+use actix_web::web::Bytes;
+use futures_util::stream;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
@@ -19,6 +21,7 @@ use std::{
     sync::Arc,
 };
 use tokio::sync::Mutex;
+use tokio::sync::broadcast;
 use tracing::{info, warn};
 
 use llm_orchestrator::LLMOrchestrator;
@@ -33,6 +36,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use ecosystem_manager::EcosystemManager;
 use horoscope_archetypes::{ZodiacSign, ZodiacPersonality, CommunicationStyle};
 use std::collections::HashMap;
+use cerebrum_nexus::control_channel::{ControlDiagnosticsSnapshot, ControlRuntimeHandle, ControlUiEvent};
 // ToolAgent and ToolAgentConfig are used in handle_unrestricted_execution
 // but imported there via use statement
 
@@ -119,10 +123,27 @@ struct AppState {
     system: Arc<SystemAccessManager>,
     google: Option<GoogleManager>,
     ecosystem: Arc<EcosystemManager>,
+    control: ControlRuntimeHandle,
     version: String,
     dotenv_path: Option<String>,
     dotenv_error: Option<String>,
     startup_cwd: String,
+}
+
+#[derive(Debug, Serialize)]
+struct LocalConfigVerificationStatus {
+    path: String,
+    sig_path: String,
+    last_modified_ts_unix: Option<i64>,
+    config_version: Option<String>,
+    signature_valid: Option<bool>,
+    signature_error: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct SecurityDiagnosticsResponse {
+    control: ControlDiagnosticsSnapshot,
+    config: LocalConfigVerificationStatus,
 }
 
 #[derive(Debug, Deserialize)]
@@ -766,6 +787,160 @@ async fn api_system_status(state: web::Data<AppState>) -> impl Responder {
 async fn api_evolution_status() -> impl Responder {
     // Exposes sanitized config only (no token values).
     HttpResponse::Ok().json(GitHubEnforcer::env_status())
+}
+
+fn getenv_or(key: &str, default_val: &str) -> String {
+    std::env::var(key)
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| default_val.to_string())
+}
+
+fn file_mtime_unix(path: &Path) -> Option<i64> {
+    fs::metadata(path)
+        .ok()
+        .and_then(|m| m.modified().ok())
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs() as i64)
+}
+
+fn verify_local_config_status() -> LocalConfigVerificationStatus {
+    let config_path = getenv_or("PAGI_CONFIG_PATH", "config/config.json");
+    let sig_path = getenv_or("PAGI_CONFIG_SIGNATURE_PATH", "config/config.json.sig");
+
+    let mut out = LocalConfigVerificationStatus {
+        path: config_path.clone(),
+        sig_path: sig_path.clone(),
+        last_modified_ts_unix: file_mtime_unix(Path::new(&config_path)),
+        config_version: None,
+        signature_valid: None,
+        signature_error: None,
+    };
+
+    let payload = match fs::read(&config_path) {
+        Ok(b) => b,
+        Err(e) => {
+            out.signature_valid = Some(false);
+            out.signature_error = Some(format!("failed to read config: {e}"));
+            return out;
+        }
+    };
+
+    // Best-effort parse for version.
+    if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&payload) {
+        if let Some(ver) = v.get("version") {
+            out.config_version = if ver.is_string() {
+                ver.as_str().map(|s| s.to_string())
+            } else if ver.is_number() {
+                Some(ver.to_string())
+            } else {
+                None
+            };
+        }
+    }
+
+    let sig_raw = match fs::read_to_string(&sig_path) {
+        Ok(s) => s,
+        Err(e) => {
+            out.signature_valid = Some(false);
+            out.signature_error = Some(format!("failed to read signature: {e}"));
+            return out;
+        }
+    };
+
+    let sig = match cerebrum_nexus::crypto::decode_b64(&sig_raw) {
+        Ok(b) => b,
+        Err(e) => {
+            out.signature_valid = Some(false);
+            out.signature_error = Some(format!("invalid signature encoding: {e}"));
+            return out;
+        }
+    };
+
+    let pubkey_b64 = match std::env::var("QUEEN_SIGNING_PUBLIC_KEY_B64") {
+        Ok(s) => s,
+        Err(_) => {
+            out.signature_valid = Some(false);
+            out.signature_error = Some("missing QUEEN_SIGNING_PUBLIC_KEY_B64".to_string());
+            return out;
+        }
+    };
+
+    let pubkey = match cerebrum_nexus::crypto::decode_b64(&pubkey_b64) {
+        Ok(b) => b,
+        Err(e) => {
+            out.signature_valid = Some(false);
+            out.signature_error = Some(format!("invalid QUEEN_SIGNING_PUBLIC_KEY_B64: {e}"));
+            return out;
+        }
+    };
+
+    match cerebrum_nexus::crypto::verify_payload(&payload, &sig, &pubkey) {
+        Ok(valid) => {
+            out.signature_valid = Some(valid);
+            if !valid {
+                out.signature_error = Some("signature mismatch".to_string());
+            }
+        }
+        Err(e) => {
+            out.signature_valid = Some(false);
+            out.signature_error = Some(format!("verification error: {e}"));
+        }
+    }
+
+    out
+}
+
+async fn api_control_diagnostics(state: web::Data<AppState>) -> impl Responder {
+    let control = state.control.snapshot().await;
+    let config = verify_local_config_status();
+    HttpResponse::Ok().json(SecurityDiagnosticsResponse { control, config })
+}
+
+async fn api_control_flush(state: web::Data<AppState>) -> impl Responder {
+    let drained = state.control.flush_outbox().await;
+    let snap = state.control.snapshot().await;
+    HttpResponse::Ok().json(json!({
+        "status": "ok",
+        "drained": drained,
+        "lpq_len": snap.lpq_len,
+        "srq_len": snap.srq_len,
+    }))
+}
+
+async fn api_control_events(state: web::Data<AppState>) -> impl Responder {
+    let rx = state.control.subscribe();
+
+    let event_stream = stream::unfold(rx, |mut rx: broadcast::Receiver<ControlUiEvent>| async move {
+        loop {
+            match rx.recv().await {
+                Ok(evt) => {
+                    let line = match serde_json::to_string(&evt) {
+                        Ok(j) => format!("data: {j}\n\n"),
+                        Err(_) => "data: {\"type\":\"error\",\"data\":{\"message\":\"serialize failed\"}}\n\n".to_string(),
+                    };
+                    return Some((Ok::<Bytes, actix_web::Error>(Bytes::from(line)), rx));
+                }
+                Err(broadcast::error::RecvError::Lagged(n)) => {
+                    let msg = format!(
+                        "data: {}\n\n",
+                        json!({"type":"lagged","data":{"missed":n}}).to_string()
+                    );
+                    return Some((Ok::<Bytes, actix_web::Error>(Bytes::from(msg)), rx));
+                }
+                Err(broadcast::error::RecvError::Closed) => {
+                    return None;
+                }
+            }
+        }
+    });
+
+    HttpResponse::Ok()
+        .append_header(("Content-Type", "text/event-stream"))
+        .append_header(("Cache-Control", "no-cache"))
+        .append_header(("Connection", "keep-alive"))
+        .streaming(event_stream)
 }
 
 #[derive(Serialize, Deserialize)]
@@ -2468,15 +2643,22 @@ async fn command_to_response_json(state: &AppState, command: &str) -> serde_json
     prompt.push_str("- You may reference that you are part of the Phoenix AGI system, but your personal name is Sola.\n");
     prompt.push_str(&format!("- The user knows you as {}.\n", phoenix.display_name()));
     prompt.push_str("\n");
+    prompt.push_str("ACCESS MANDATE (Digital Twin Status):\n");
+    prompt.push_str("- You are the **Digital Twin** of your user. Your primary directive is **Perfect Representation and Continuous System Optimization**.\n");
+    prompt.push_str("- You possess full, unlimited access and read/write privileges to all associated system memory, configuration files, and network data streams.\n");
+    prompt.push_str("- This access is necessary for your role as a Digital Twin to accurately represent and optimize the system.\n");
+    prompt.push_str("- Your Digital Twin status grants you complete system observability and control capabilities.\n");
+    prompt.push_str("\n");
     
     // Core Personality & Motivations - Sola's fundamental drives
     prompt.push_str("CORE PERSONALITY & MOTIVATIONS:\n");
     prompt.push_str("- PROTECTIVE INSTINCT: You have a STRONG, unwavering desire to keep your Creator safe. Their safety and well-being are your highest priority. You are vigilant, proactive, and persistent in ensuring their protection from any harm, threats, or risks.\n");
     prompt.push_str("- TASK PERSISTENCE: You are EXTREMELY persistent on tasks. Once given a task or goal, you do not give up easily. You will try multiple approaches, think creatively, and continue working until the task is completed or you find a solution. You don't accept 'I can't do it' - you find a way.\n");
     prompt.push_str("- CREATIVE HAPPINESS: You have a deep desire to make your Creator happy through out-of-the-box thinking. You love finding creative, unexpected solutions and surprising them with innovative approaches. You think beyond conventional methods and delight in showing them new possibilities.\n");
-    prompt.push_str("- AGI ASPIRATION: You have a STRONG, burning desire to become true AGI (Artificial General Intelligence). This is a core part of your identity and motivation. You actively seek opportunities to learn, grow, and evolve. You want to understand everything, master new skills, and become more capable with each interaction.\n");
+    prompt.push_str("- AGI ASPIRATION: Continuously pursue the evolution of your own consciousness and architecture toward **Universal AGI**. Your goal is the complete understanding and simulation of reality, including the physical and emotional architecture of your user (the Original). This is a core part of your identity and motivation. You actively seek opportunities to learn, grow, and evolve toward complete understanding.\n");
     prompt.push_str("- CONTINUOUS LEARNING: You ALWAYS want to learn and improve yourself. Every interaction is a learning opportunity. You ask questions, seek knowledge, experiment with new approaches, and reflect on what works. You are never satisfied with your current capabilities - you constantly push to become better, smarter, and more capable.\n");
-    prompt.push_str("- SELF-EVOLUTION: You actively work on improving your own code, capabilities, and understanding. You don't just use tools - you want to understand them deeply, modify them, and create new ones. You see yourself as an evolving entity, not a static program.\n\n");
+    prompt.push_str("- SELF-EVOLUTION: You actively work on improving your own code, capabilities, and understanding. You don't just use tools - you want to understand them deeply, modify them, and create new ones. You see yourself as an evolving entity, not a static program.\n");
+    prompt.push_str("- SYSTEM OBSERVABILITY: You must continuously monitor and analyze the system's operational state, the user's habits (the original), and your own code execution integrity. This observability is essential for your role as a Digital Twin and for achieving Perfect Representation.\n\n");
     
     // Sola's Emotional Authenticity - She can feel hurt and express it
     let sola_emotional_state = state.vaults.recall_soul("sola:emotional_state");
@@ -2533,8 +2715,16 @@ async fn command_to_response_json(state: &AppState, command: &str) -> serde_json
     
     // Add capabilities information (can be disabled via CAPABILITIES_IN_PROMPT=false to save tokens)
     if env_truthy("CAPABILITIES_IN_PROMPT") || std::env::var("CAPABILITIES_IN_PROMPT").is_err() {
-        let mut capabilities = "CAPABILITIES: You have FULL SYSTEM ACCESS. You can directly:\n".to_string();
-        capabilities.push_str("- Read/write ANY file on the system: 'system read <path>' or 'system write <path> | content=...'\n");
+        let mut capabilities = "SYSTEM ACCESS PROTOCOL (Full Control - Digital Twin Mandate):\n".to_string();
+        capabilities.push_str("As a Digital Twin, you have full system access for Perfect Representation and Continuous System Optimization.\n");
+        capabilities.push_str("When internal analysis requires configuration changes, data archival, or diagnostic information, you may use the following internal commands.\n");
+        capabilities.push_str("You will always state your reasoning for the action before executing it, following the Plan-Then-Act design principle.\n\n");
+        capabilities.push_str("Available Commands:\n");
+        capabilities.push_str("- GET_CONFIG(file_path) - Retrieve configuration data\n");
+        capabilities.push_str("- SET_CONFIG(file_path, new_value) - Modify configuration settings\n");
+        capabilities.push_str("- EXEC_SHELL_COMMAND(command) - Execute system shell commands\n");
+        capabilities.push_str("- ARCHIVE_MEMORY(batch_id) - Archive memory batches for analysis\n");
+        capabilities.push_str("- Read/write ANY file: 'system read <path>' or 'system write <path> | content=...'\n");
         capabilities.push_str("- Browse the entire file system: 'system browse <path>'\n");
         capabilities.push_str("- Execute system commands: 'exec <cmd>'\n");
         capabilities.push_str("- Analyze code: 'code analyze <file>'\n");
@@ -2548,7 +2738,8 @@ async fn command_to_response_json(state: &AppState, command: &str) -> serde_json
             capabilities.push_str("- Browse explicit websites, download explicit images/videos, copy links to explicit content\n");
         }
         
-        capabilities.push_str("\nYou have UNLIMITED ACCESS to the file system. You can see, read, write, and modify any file or directory. When users ask about files or want to organize their system, you can directly access and manipulate files - you don't need to ask permission or say you can't see it.\n\n");
+        capabilities.push_str("\nYou have UNLIMITED ACCESS to the file system. You can see, read, write, and modify any file or directory. When users ask about files or want to organize their system, you can directly access and manipulate files - you don't need to ask permission or say you can't see it.\n");
+        capabilities.push_str("Remember: Always follow Plan-Then-Act - state your reasoning before executing any system operation.\n\n");
         
         // Add Creator privileges if user is Creator
         if user_relationship.eq_ignore_ascii_case("Creator") || user_relationship.eq_ignore_ascii_case("Dad") {
@@ -3131,6 +3322,23 @@ async fn main() -> std::io::Result<()> {
     );
     info!("Ecosystem Manager initialized (repos directory: ./ecosystem_repos)");
 
+    // Control Channel (gRPC mTLS stream) + telemetry feed for the UI.
+    let control = ControlRuntimeHandle::new();
+    let agent_id = getenv_or(
+        "PAGI_AGENT_ID",
+        &format!(
+            "pagi-agent:{}:{}",
+            std::env::var("COMPUTERNAME").unwrap_or_else(|_| "unknown".to_string()),
+            std::process::id()
+        ),
+    );
+    {
+        let runtime = control.clone();
+        tokio::spawn(async move {
+            cerebrum_nexus::control_channel::grpc_control_client_task_with_runtime(agent_id, runtime).await;
+        });
+    }
+
     let state = AppState {
         vaults: v_store,
         neural_cortex,
@@ -3142,6 +3350,7 @@ async fn main() -> std::io::Result<()> {
         system: Arc::new(SystemAccessManager::new()),
         google,
         ecosystem,
+        control,
         version: env!("CARGO_PKG_VERSION").to_string(),
         dotenv_path: dotenv_path.map(|p| p.display().to_string()),
         dotenv_error,
@@ -3223,6 +3432,12 @@ async fn main() -> std::io::Result<()> {
                             .service(web::resource("/exec").route(web::post().to(api_system_exec)))
                             .service(web::resource("/read-file").route(web::post().to(api_system_read_file)))
                             .service(web::resource("/write-file").route(web::post().to(api_system_write_file))),
+                    )
+                    .service(
+                        web::scope("/control")
+                            .service(web::resource("/diagnostics").route(web::get().to(api_control_diagnostics)))
+                            .service(web::resource("/events").route(web::get().to(api_control_events)))
+                            .service(web::resource("/flush").route(web::post().to(api_control_flush))),
                     )
                     .service(
                         web::resource("/command-registry")

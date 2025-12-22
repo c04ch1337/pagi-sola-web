@@ -6,7 +6,7 @@ export default defineConfig(({ mode }) => {
     // Load env from repo root so `VITE_*` can live alongside the Rust `.env`.
     const repoRoot = path.resolve(__dirname, '..');
     const env = loadEnv(mode, repoRoot, '');
-    const apiBase = 'http://127.0.0.1:5000'; // Hardcoded to use port 5000
+    const apiBase = 'http://127.0.0.1:5000'; // Backend API port
     return {
       server: {
         port: 8888, // Hardcoded to use port 8888
@@ -24,6 +24,17 @@ export default defineConfig(({ mode }) => {
             changeOrigin: true,
           },
         },
+        // Ensure all routes, including the index, navigate to the same entry points regardless of URL
+        fs: {
+          allow: ['.']
+        }
+      },
+      // Force consistent dev server routing across both localhost and IP access
+      publicDir: 'public',
+      base: '/',
+      appType: 'spa',
+      optimizeDeps: {
+        include: ['react', 'react-dom']
       },
       plugins: [react()],
       resolve: {

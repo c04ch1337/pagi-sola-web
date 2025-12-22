@@ -7,3 +7,12 @@ edition = "2024"
 chrono = { version = "0.4", features = ["serde", "clock"] }
 serde = { version = "1.0", features = ["derive"] }
 
+# Optional (framework integration).
+axum = { version = "0.7", optional = true }
+actix-web = { version = "4", optional = true }
+
+[features]
+default = []
+axum = ["dep:axum"]
+actix = ["dep:actix-web"]
+
